@@ -1,17 +1,17 @@
 """
 BOLT ⚡ — Database Module
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-🆓 Free mode — no subscription codes needed
-🔐 All tokens encrypted at rest (AES-256 via Fernet)
-📊 User stats, rewards, activity tracking
-🗄️ SQLite with WAL mode
+📊 Users, Tokens, Rewards, Activity
+👥 Admins Management
+ Tutorial Videos
+🚫 Bans (permanent/temporary with reason)
 """
 
 import os
 import sqlite3
 import threading
 from datetime import datetime, timezone
-from crypto_utils import encrypt_token, decrypt_token, token_fingerprint, mask_token
+from crypto_utils import encrypt_token, decrypt_token, token_fingerprint
 
 DB_FILE = os.environ.get("DB_PATH", "bolt.db")
 _lock = threading.Lock()
@@ -40,7 +40,8 @@ def init_db():
             user_id          INTEGER PRIMARY KEY,
             username         TEXT DEFAULT '',
             first_name       TEXT DEFAULT '',
-            lang             TEXT DEFAULT 'ar',
+            lang             TEXT DEFAULT '',
+            onboarded        INTEGER DEFAULT 0,
             encrypted_token  TEXT DEFAULT NULL,
             token_fingerprint TEXT DEFAULT NULL,
             token_set_at     TEXT DEFAULT NULL,
@@ -49,10 +50,8 @@ def init_db():
             total_ops        INTEGER DEFAULT 0,
             today_ops        INTEGER DEFAULT 0,
             today_ops_date   TEXT DEFAULT '',
-            is_admin         INTEGER DEFAULT 0,
             referral_code    TEXT DEFAULT '',
-            referred_by      INTEGER DEFAULT NULL,
-            referral_count   INTEGER DEFAULT 0
+            referred_by      INTEGER DEFAULT NULL
         );
 
         CREATE TABLE IF NOT EXISTS rewards (
@@ -65,15 +64,38 @@ def init_db():
             PRIMARY KEY (user_id)
         );
 
-        CREATE TABLE IF NOT EXISTS reward_history (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id     INTEGER NOT NULL,
-            action      TEXT NOT NULL,
-            points      INTEGER NOT NULL,
-            detail      TEXT DEFAULT '',
-            timestamp   TEXT NOT NULL
+        CREATE TABLE IF NOT EXISTS admins (
+            user_id       INTEGER PRIMARY KEY,
+            added_by      INTEGER NOT NULL,
+            added_at      TEXT NOT NULL,
+            permissions   TEXT DEFAULT 'full'
         );
-        CREATE INDEX IF NOT EXISTS idx_rh_user ON reward_history(user_id, timestamp DESC);
+
+        CREATE TABLE IF NOT EXISTS tutorial_videos (
+            platform      TEXT PRIMARY KEY,
+            video_url     TEXT NOT NULL,
+            updated_by    INTEGER NOT NULL,
+            updated_at    TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS settings (
+            key           TEXT PRIMARY KEY,
+            value         TEXT NOT NULL,
+            updated_by    INTEGER NOT NULL,
+            updated_at    TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS bans (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id       INTEGER NOT NULL,
+            banned_by     INTEGER NOT NULL,
+            reason        TEXT NOT NULL,
+            duration_hours REAL DEFAULT NULL,
+            banned_at     TEXT NOT NULL,
+            expires_at    TEXT DEFAULT NULL,
+            is_active     INTEGER DEFAULT 1
+        );
+        CREATE INDEX IF NOT EXISTS idx_bans_user ON bans(user_id, is_active);
 
         CREATE TABLE IF NOT EXISTS activity_log (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,13 +117,22 @@ def init_db():
             created_at  TEXT NOT NULL,
             resolved_at TEXT DEFAULT NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_st_status ON support_tickets(status);
         """)
         c.commit()
+
+        # Initialize tutorial videos if not exist
+        existing = c.execute("SELECT COUNT(*) FROM tutorial_videos").fetchone()[0]
+        if existing == 0:
+            now = _now()
+            c.execute("INSERT INTO tutorial_videos (platform, video_url, updated_by, updated_at) VALUES (?, ?, ?, ?)",
+                      ("android", "https://example.com/android-tutorial.mp4", 0, now))
+            c.execute("INSERT INTO tutorial_videos (platform, video_url, updated_by, updated_at) VALUES (?, ?, ?, ?)",
+                      ("ios", "https://example.com/ios-tutorial.mp4", 0, now))
+
         c.close()
 
 
-# ─── User CRUD ────────────────────────────────────────────────────────────────
+# ─── User Management ──────────────────────────────────────────────────────────
 
 def ensure_user(user_id: int, username: str = "", first_name: str = "") -> dict:
     """Create user if new, update last_active."""
@@ -116,7 +147,6 @@ def ensure_user(user_id: int, username: str = "", first_name: str = "") -> dict:
             c.close()
             return dict(existing)
 
-        # Generate referral code
         import random, string
         ref = "BLT" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
         c.execute("""
@@ -148,13 +178,21 @@ def set_lang(user_id: int, lang: str):
 
 def get_lang(user_id: int) -> str:
     u = get_user(user_id)
-    return u["lang"] if u else "ar"
+    return u["lang"] if u and u["lang"] else "ar"
+
+
+def set_onboarded(user_id: int, value: int = 1):
+    with _lock:
+        c = _conn()
+        c.execute("UPDATE users SET onboarded=? WHERE user_id=?", (value, user_id))
+        c.commit()
+        c.close()
 
 
 # ─── Token Management ────────────────────────────────────────────────────────
 
 def set_token(user_id: int, token: str):
-    """Encrypt and store the access token with fingerprint."""
+    """Encrypt and store the access token."""
     enc = encrypt_token(token)
     fp = token_fingerprint(token)
     now = _now()
@@ -179,25 +217,6 @@ def get_token(user_id: int) -> str | None:
     return decrypt_token(row["encrypted_token"])
 
 
-def get_token_info(user_id: int) -> dict:
-    """Get token metadata (no actual token)."""
-    with _lock:
-        c = _conn()
-        row = c.execute("""
-            SELECT encrypted_token, token_fingerprint, token_set_at
-            FROM users WHERE user_id=?
-        """, (user_id,)).fetchone()
-        c.close()
-    if not row or not row["encrypted_token"]:
-        return {"has_token": False}
-    return {
-        "has_token": True,
-        "fingerprint": row["token_fingerprint"],
-        "set_at": row["token_set_at"],
-        "masked": "***",  # we don't expose even masked token
-    }
-
-
 def clear_token(user_id: int):
     with _lock:
         c = _conn()
@@ -217,9 +236,183 @@ def has_token(user_id: int) -> bool:
     return bool(row and row["encrypted_token"])
 
 
-# ─── Daily Operations Counter ────────────────────────────────────────────────
+# ─── Admin Management ────────────────────────────────────────────────────────
 
-DAILY_OP_LIMIT = 15  # generous free limit
+def is_admin(user_id: int) -> bool:
+    """Check if user is admin (owner or in admins table)."""
+    owner = int(os.environ.get("OWNER_ID", "0"))
+    if user_id == owner:
+        return True
+    with _lock:
+        c = _conn()
+        row = c.execute("SELECT user_id FROM admins WHERE user_id=?", (user_id,)).fetchone()
+        c.close()
+    return row is not None
+
+
+def add_admin(user_id: int, added_by: int, permissions: str = "full") -> bool:
+    """Add user as admin. Returns True if successful."""
+    if is_admin(user_id):
+        return False
+    with _lock:
+        c = _conn()
+        c.execute("INSERT INTO admins (user_id, added_by, added_at, permissions) VALUES (?,?,?,?)",
+                  (user_id, added_by, _now(), permissions))
+        c.commit()
+        c.close()
+    return True
+
+
+def remove_admin(user_id: int) -> bool:
+    """Remove admin. Returns True if successful."""
+    owner = int(os.environ.get("OWNER_ID", "0"))
+    if user_id == owner:
+        return False
+    with _lock:
+        c = _conn()
+        c.execute("DELETE FROM admins WHERE user_id=?", (user_id,))
+        c.commit()
+        c.close()
+    return True
+
+
+def get_admins() -> list[dict]:
+    """Get all admins."""
+    with _lock:
+        c = _conn()
+        rows = c.execute("SELECT * FROM admins ORDER BY added_at DESC").fetchall()
+        c.close()
+    return [dict(r) for r in rows]
+
+
+# ─── Tutorial Videos ─────────────────────────────────────────────────────────
+
+def get_tutorial_video(platform: str) -> str | None:
+    """Get tutorial video URL for platform (android/ios)."""
+    with _lock:
+        c = _conn()
+        row = c.execute("SELECT video_url FROM tutorial_videos WHERE platform=?", (platform,)).fetchone()
+        c.close()
+    return row["video_url"] if row else None
+
+
+def update_tutorial_video(platform: str, video_url: str, updated_by: int):
+    """Update tutorial video URL."""
+    with _lock:
+        c = _conn()
+        c.execute("""
+            INSERT OR REPLACE INTO tutorial_videos (platform, video_url, updated_by, updated_at)
+            VALUES (?,?,?,?)
+        """, (platform, video_url, updated_by, _now()))
+        c.commit()
+        c.close()
+
+
+# ─── Settings ────────────────────────────────────────────────────────────────
+
+def get_setting(key: str) -> str | None:
+    """Get setting value."""
+    with _lock:
+        c = _conn()
+        row = c.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+        c.close()
+    return row["value"] if row else None
+
+
+def set_setting(key: str, value: str, updated_by: int):
+    """Set setting value."""
+    with _lock:
+        c = _conn()
+        c.execute("""
+            INSERT OR REPLACE INTO settings (key, value, updated_by, updated_at)
+            VALUES (?,?,?,?)
+        """, (key, value, updated_by, _now()))
+        c.commit()
+        c.close()
+
+
+# ─── Ban System ─────────────────────────────────────────────────────────────
+
+def ban_user(user_id: int, banned_by: int, reason: str, duration_hours: float = None) -> bool:
+    """
+    Ban user.
+    duration_hours=None means permanent ban.
+    Returns True if successful.
+    """
+    if is_admin(user_id):
+        return False
+    with _lock:
+        c = _conn()
+        # Deactivate existing bans
+        c.execute("UPDATE bans SET is_active=0 WHERE user_id=? AND is_active=1", (user_id,))
+        
+        expires_at = None
+        if duration_hours:
+            from datetime import timedelta
+            expires_at = (datetime.now(timezone.utc) + timedelta(hours=duration_hours)).isoformat()
+        
+        c.execute("""
+            INSERT INTO bans (user_id, banned_by, reason, duration_hours, banned_at, expires_at, is_active)
+            VALUES (?,?,?,?,?,?,1)
+        """, (user_id, banned_by, reason, duration_hours, _now(), expires_at))
+        c.commit()
+        c.close()
+    return True
+
+
+def unban_user(user_id: int) -> bool:
+    """Unban user. Returns True if successful."""
+    with _lock:
+        c = _conn()
+        c.execute("UPDATE bans SET is_active=0 WHERE user_id=? AND is_active=1", (user_id,))
+        c.commit()
+        c.close()
+    return True
+
+
+def is_banned(user_id: int) -> tuple[bool, str]:
+    """Check if user is banned. Returns (is_banned, reason)."""
+    with _lock:
+        c = _conn()
+        row = c.execute("""
+            SELECT reason, expires_at, duration_hours FROM bans 
+            WHERE user_id=? AND is_active=1 
+            ORDER BY id DESC LIMIT 1
+        """, (user_id,)).fetchone()
+        c.close()
+    
+    if not row:
+        return False, ""
+    
+    reason = row["reason"]
+    expires_at = row["expires_at"]
+    
+    # Check if expired
+    if expires_at:
+        if datetime.fromisoformat(expires_at) < datetime.now(timezone.utc):
+            unban_user(user_id)
+            return False, ""
+    
+    return True, reason
+
+
+def get_bans(limit: int = 50) -> list[dict]:
+    """Get recent bans."""
+    with _lock:
+        c = _conn()
+        rows = c.execute("""
+            SELECT b.*, u.username, u.first_name 
+            FROM bans b LEFT JOIN users u ON b.user_id = u.user_id
+            WHERE b.is_active=1 
+            ORDER BY b.id DESC LIMIT ?
+        """, (limit,)).fetchall()
+        c.close()
+    return [dict(r) for r in rows]
+
+
+# ─── Daily Operations ────────────────────────────────────────────────────────
+
+DAILY_OP_LIMIT = 15
 
 def check_daily_ops(user_id: int) -> tuple[bool, int, int]:
     """Returns (allowed, remaining, limit)."""
@@ -240,6 +433,19 @@ def check_daily_ops(user_id: int) -> tuple[bool, int, int]:
         c.commit()
         c.close()
         return True, DAILY_OP_LIMIT - ops - 1, DAILY_OP_LIMIT
+
+
+def peek_daily_ops(user_id: int) -> tuple[int, int]:
+    """Returns (remaining, limit) WITHOUT consuming an op."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    with _lock:
+        c = _conn()
+        row = c.execute("SELECT today_ops, today_ops_date FROM users WHERE user_id=?", (user_id,)).fetchone()
+        c.close()
+    if not row or row["today_ops_date"] != today:
+        return DAILY_OP_LIMIT, DAILY_OP_LIMIT
+    ops = row["today_ops"]
+    return max(0, DAILY_OP_LIMIT - ops), DAILY_OP_LIMIT
 
 
 def increment_ops(user_id: int):
@@ -284,20 +490,11 @@ def get_rewards(user_id: int) -> dict:
 
 
 def add_points(user_id: int, points: int, action: str, detail: str = ""):
-    """Add reward points and log history."""
+    """Add reward points."""
     with _lock:
         c = _conn()
         c.execute("UPDATE rewards SET points=points+?, total_earned=total_earned+? WHERE user_id=?",
                   (points, points, user_id))
-        # Level up check
-        row = c.execute("SELECT points FROM rewards WHERE user_id=?", (user_id,)).fetchone()
-        if row:
-            level = _calc_level(row["points"])
-            c.execute("UPDATE rewards SET level=? WHERE user_id=?", (level, user_id))
-        c.execute("""
-            INSERT INTO reward_history (user_id, action, points, detail, timestamp)
-            VALUES (?,?,?,?,?)
-        """, (user_id, action, points, detail[:200], _now()))
         c.commit()
         c.close()
 
@@ -315,34 +512,16 @@ def claim_daily(user_id: int) -> tuple[bool, int]:
             c.close()
             return False, 0
 
-        # Calculate streak
         from datetime import timedelta
         yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
         streak = (row["streak"] + 1) if row["last_daily"] == yesterday else 1
-        # Points scale with streak (5 base + 1 per streak day, max 15)
         points = min(5 + streak, 15)
 
         c.execute("UPDATE rewards SET last_daily=?, streak=?, points=points+?, total_earned=total_earned+? WHERE user_id=?",
                   (today, streak, points, points, user_id))
-        c.execute("""
-            INSERT INTO reward_history (user_id, action, points, detail, timestamp)
-            VALUES (?,?,?,?,?)
-        """, (user_id, "daily", points, f"streak={streak}", _now()))
         c.commit()
         c.close()
     return True, points
-
-
-def _calc_level(points: int) -> int:
-    """Calculate level from total points earned."""
-    if points < 50: return 1
-    if points < 150: return 2
-    if points < 350: return 3
-    if points < 700: return 4
-    if points < 1200: return 5
-    if points < 2000: return 6
-    if points < 3500: return 7
-    return 8  # MAX level
 
 
 # ─── Support Tickets ─────────────────────────────────────────────────────────
@@ -393,15 +572,7 @@ def resolve_ticket(ticket_id: int, reply: str):
         c.close()
 
 
-# ─── Admin / Stats ────────────────────────────────────────────────────────────
-
-def is_admin(user_id: int) -> bool:
-    owner = int(os.environ.get("OWNER_ID", "0"))
-    if user_id == owner:
-        return True
-    u = get_user(user_id)
-    return u is not None and u["is_admin"] == 1
-
+# ─── Stats ────────────────────────────────────────────────────────────────────
 
 def user_count() -> int:
     with _lock:
@@ -440,8 +611,10 @@ def export_data() -> dict:
         c = _conn()
         data = {
             "users": [dict(r) for r in c.execute("SELECT * FROM users").fetchall()],
+            "admins": [dict(r) for r in c.execute("SELECT * FROM admins").fetchall()],
             "rewards": [dict(r) for r in c.execute("SELECT * FROM rewards").fetchall()],
             "tickets": [dict(r) for r in c.execute("SELECT * FROM support_tickets").fetchall()],
+            "bans": [dict(r) for r in c.execute("SELECT * FROM bans WHERE is_active=1").fetchall()],
             "exported_at": _now(),
         }
         c.close()
