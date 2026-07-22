@@ -1,7 +1,8 @@
 """
 BOLT ⚡ — Internationalization
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🌍 Arabic / English / Vietnamese / Hindi
+ Arabic / English / Vietnamese / Hindi
+📖 Full tutorials for each language
 """
 
 from __future__ import annotations
@@ -9,392 +10,806 @@ import database as D
 
 LANGS = {
     "ar": "🇸🇦 العربية",
-    "en": "🇬🇧 English",
+    "en": "🇬 English",
     "vi": "🇻🇳 Tiếng Việt",
     "hi": "🇮🇳 हिन्दी",
 }
 
 _S: dict[str, dict[str, str]] = {
 
-    # ═══ HOME ═══════════════════════════════════════════════════════════
-    "home_title": {
-        "ar": "⚡ **BOLT** — بوت إدارة الحسابات",
-        "en": "⚡ **BOLT** — Account Manager",
-        "vi": "⚡ **BOLT** — Quản lý tài khoản",
-        "hi": "⚡ **BOLT** — खाता प्रबंधक",
-    },
-    "home_sub": {
-        "ar": "🛡️ محمي • مجاني • سريع",
-        "en": "🛡️ Protected • Free • Fast",
-        "vi": "🛡️ Bảo mật • Miễn phí • Nhanh",
-        "hi": "🛡️ सुरक्षित • मुफ़्त • तेज़",
-    },
-    "home_stats": {
-        "ar": "📊 العمليات اليوم: **{ops}/{max}** | 🔥 السلسلة: **{streak}** يوم",
-        "en": "📊 Today's ops: **{ops}/{max}** | 🔥 Streak: **{streak}** days",
-        "vi": "📊 Hôm nay: **{ops}/{max}** | 🔥 Chuỗi: **{streak}** ngày",
-        "hi": "📊 आज: **{ops}/{max}** | 🔥 स्ट्रीक: **{streak}** दिन",
-    },
-    "home_token_status": {
-        "ar": "🔐 التوكن: **{status}**",
-        "en": "🔐 Token: **{status}**",
-        "vi": "🔐 Token: **{status}**",
-        "hi": "🔐 टोकन: **{status}**",
-    },
-    "token_active": {"ar": "✅ مُفعّل", "en": "✅ Active", "vi": "✅ Hoạt động", "hi": "✅ सक्रिय"},
-    "token_none": {"ar": "❌ غير مُضاف", "en": "❌ Not set", "vi": "❌ Chưa thêm", "hi": "❌ नहीं जोड़ा"},
-    "home_choose": {
-        "ar": "⬇️ اختر من القائمة:",
-        "en": "⬇️ Choose:",
-        "vi": "⬇️ Chọn:",
-        "hi": "⬇️ चुनें:",
+    # ═══════════════════════════════════════════════════════════════════
+    #  LANGUAGE SELECTION (First Screen)
+    # ═══════════════════════════════════════════════════════════════════
+
+    "welcome_select_lang": {
+        "ar": (
+            "<b>⚡ مرحباً بك في BOLT!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🛡️ بوت <b>مجاني 100%</b> لإدارة حسابات فري فاير\n"
+            "🔐 توكنك مشفر بأمان تام\n"
+            "🏆 أدوات احترافية تؤثر فعلياً على حسابك\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🌍 <b>اختر لغتك المفضلة:</b>"
+        ),
+        "en": (
+            "<b>⚡ Welcome to BOLT!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🛡️ <b>100% free</b> Free Fire account manager\n"
+            "🔐 Your token is fully encrypted\n"
+            " Professional tools that affect your account\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🌍 <b>Choose your language:</b>"
+        ),
+        "vi": (
+            "<b>⚡ Chào mừng đến BOLT!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🛡️ <b>100% miễn phí</b>\n"
+            "🔐 Token mã hóa hoàn toàn\n"
+            "🏆 Công cụ chuyên nghiệp\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🌍 <b>Chọn ngôn ngữ:</b>"
+        ),
+        "hi": (
+            "<b>⚡ BOLT में स्वागत!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "️ <b>100% मुफ़्त</b>\n"
+            " टोकन पूर्ण रूप से एन्क्रिप्टेड\n"
+            "🏆 पेशेवर उपकरण\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            " <b>अपनी भाषा चुनें:</b>"
+        ),
     },
 
-    # ═══ BUTTONS ════════════════════════════════════════════════════════
-    "btn_tools":     {"ar": "🔧 الأدوات", "en": "🔧 Tools", "vi": "🔧 Công cụ", "hi": "🔧 टूल्स"},
-    "btn_add":       {"ar": "➕ إضافة حساب", "en": "➕ Add", "vi": "➕ Thêm", "hi": "➕ जोड़ें"},
-    "btn_card":      {"ar": "🃏 بطاقتي", "en": "🃏 My Card", "vi": "🃏 Thẻ", "hi": "🃏 कार्ड"},
-    "btn_rewards":   {"ar": "🏆 المكافآت", "en": "🏆 Rewards", "vi": "🏆 Thưởng", "hi": "🏆 इनाम"},
-    "btn_daily":     {"ar": "🎁 هدية يومية", "en": "🎁 Daily", "vi": "🎁 Quà", "hi": "🎁 रोज़ाना"},
-    "btn_support":   {"ar": "💬 الدعم", "en": "💬 Support", "vi": "💬 Hỗ trợ", "hi": "💬 सहायता"},
-    "btn_leaderboard":{"ar": "📊 المتصدرون", "en": "📊 Top", "vi": "📊 Top", "hi": "📊 टॉप"},
-    "btn_lang":      {"ar": "🌍 اللغة", "en": "🌍 Lang", "vi": "🌍 Ngôn ngữ", "hi": "🌍 भाषा"},
-    "btn_admin":     {"ar": "👑 الإدارة", "en": "👑 Admin", "vi": "👑 Admin", "hi": "👑 एडमिन"},
-    "btn_back":      {"ar": "🔙 رجوع", "en": "🔙 Back", "vi": "🔙 Lại", "hi": "🔙 वापस"},
-    "btn_home":      {"ar": "🏠 الرئيسية", "en": "🏠 Home", "vi": "🏠 Trang chủ", "hi": "🏠 मुख्य"},
-    "btn_cancel":    {"ar": "❌ إلغاء", "en": "❌ Cancel", "vi": "❌ Huỷ", "hi": "❌ रद्द"},
+    "lang_selected": {
+        "ar": "✅ <b>تم اختيار اللغة!</b>\n\n جاري تحميل الشرح...",
+        "en": "✅ <b>Language selected!</b>\n\n Loading tutorial...",
+        "vi": "✅ <b>Đã chọn ngôn ngữ!</b>\n\n Đang tải hướng dẫn...",
+        "hi": "✅ <b>भाषा चुनी गई!</b>\n\n ट्यूटोरियल लोड हो रहा है...",
+    },
 
-    # ═══ TOOLS ══════════════════════════════════════════════════════════
-    "tools_title": {
-        "ar": "🔧 **أدوات الحساب**\n\n🛡️ جميع العمليات آمنة ومباشرة\n⬇️ اختر:",
-        "en": "🔧 **Account Tools**\n\n🛡️ All ops are safe & direct\n⬇️ Choose:",
-        "vi": "🔧 **Công cụ**\n\n🛡️ An toàn & trực tiếp\n⬇️ Chọn:",
-        "hi": "🔧 **टूल्स**\n\n🛡️ सुरक्षित & सीधा\n⬇️ चुनें:",
-    },
-    "btn_nickname":    {"ar": "🎭 تغيير الاسم", "en": "🎭 Name", "vi": "🎭 Tên", "hi": "🎭 नाम"},
-    "btn_player_info": {"ar": "👤 معلوماتي", "en": "👤 My Info", "vi": "👤 Info", "hi": "👤 जानकारी"},
-    "btn_check_token": {"ar": "🔍 فحص التوكن", "en": "🔍 Check", "vi": "🔍 Kiểm tra", "hi": "🔍 जांच"},
-    "btn_bind_info":   {"ar": "📡 الربط", "en": "📡 Bind", "vi": "📡 Liên kết", "hi": "📡 बाइंड"},
-    "btn_check_links": {"ar": "🌐 المنصات", "en": "🌐 Links", "vi": "🌐 Liên kết", "hi": "🌐 लिंक"},
-    "btn_history":     {"ar": "📋 السجل", "en": "📋 History", "vi": "📋 Lịch sử", "hi": "📋 इतिहास"},
+    # ═══════════════════════════════════════════════════════════════════
+    #  TUTORIAL SCREEN
+    # ═══════════════════════════════════════════════════════════════════
 
-    # ═══ TOKEN ══════════════════════════════════════════════════════════
-    "no_token": {
-        "ar": "🔐 لم تضف حساباً بعد.\n📩 أرسل **Access Token** :",
-        "en": "🔐 No account yet.\n📩 Send **Access Token**:",
-        "vi": "🔐 Chưa có tài khoản.\n📩 Gửi **Access Token**:",
-        "hi": "🔐 कोई खाता नहीं।\n📩 **Access Token** भेजें:",
+    "tutorial_title": {
+        "ar": "<b>📱 كيف تحصل على Access Token?</b>",
+        "en": "<b>📱 How to Get Access Token?</b>",
+        "vi": "<b>📱 Cách lấy Access Token?</b>",
+        "hi": "<b>📱 Access Token कैसे प्राप्त करें?</b>",
     },
-    "send_token": {
-        "ar": "📩 أرسل **Access Token** الجديد:",
-        "en": "📩 Send new **Access Token**:",
-        "vi": "📩 Gửi **Access Token** mới:",
-        "hi": "📩 नया **Access Token** भेजें:",
+
+    "tutorial_subtitle": {
+        "ar": "━━━━━━━━━━━━━━━━━━━\n📖 اتبع الخطوات بعناية",
+        "en": "━━━━━━━━━━━━━━━━━━━\n📖 Follow steps carefully",
+        "vi": "━━━━━━━━━━━━━━━━━━━\n📖 Làm theo từng bước",
+        "hi": "━━━━━━━━━━━━━━━━━━━\n📖 सावधानी से पालन करें",
     },
+
+    "tutorial_what_is": {
+        "ar": (
+            "<b>❓ ما هو Access Token؟</b>\n\n"
+            "هو رمز سري يربط البوت بحسابك في Free Fire.\n"
+            "بدونه لا يمكن استخدام أي أداة.\n\n"
+            "⚠️ <b>تحذيرات مهمة:</b>\n"
+            "• 🔐 البوت يشفر التوكن ويحميه\n"
+            "• ❌ لا تشارك التوكن مع أي شخص\n"
+            "• ️ التوكن محمي بتشفير AES-256"
+        ),
+        "en": (
+            "<b>❓ What is Access Token?</b>\n\n"
+            "It's a secret key connecting the bot to your Free Fire account.\n"
+            "Without it, no tool can work.\n\n"
+            "️ <b>Important:</b>\n"
+            "• 🔐 The bot encrypts your token\n"
+            "• ❌ Never share it with anyone\n"
+            "• ️ Protected with AES-256"
+        ),
+        "vi": (
+            "<b>❓ Access Token là gì?</b>\n\n"
+            "Là khóa bí mật kết nối bot với tài khoản Free Fire.\n"
+            "Không có nó, không thể sử dụng công cụ nào.\n\n"
+            "⚠️ <b>Quan trọng:</b>\n"
+            "• 🔐 Bot mã hóa token của bạn\n"
+            "• ❌ Không chia sẻ với ai\n"
+            "• 🛡️ Bảo vệ bằng AES-256"
+        ),
+        "hi": (
+            "<b>❓ Access Token क्या है?</b>\n\n"
+            "यह एक गुप्त कुंजी है जो बॉट को आपके Free Fire खाते से जोड़ती है।\n"
+            "इसके बिना कोई टूल काम नहीं कर सकता।\n\n"
+            "️ <b>महत्वपूर्ण:</b>\n"
+            "• 🔐 बॉट आपके टोकन को एन्क्रिप्ट करता है\n"
+            "• ❌ किसी के साथ साझा न करें\n"
+            "• ️ AES-256 से सुरक्षित"
+        ),
+    },
+
+    "tutorial_choose_platform": {
+        "ar": (
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "<b>📱 اختر نوع جهازك:</b>"
+        ),
+        "en": (
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "<b>📱 Choose your device:</b>"
+        ),
+        "vi": (
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "<b>📱 Chọn thiết bị của bạn:</b>"
+        ),
+        "hi": (
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "<b> अपना डिवाइस चुनें:</b>"
+        ),
+    },
+
+    "tutorial_android_title": {
+        "ar": " أندرويد",
+        "en": "🤖 Android",
+        "vi": "🤖 Android",
+        "hi": " Android",
+    },
+
+    "tutorial_ios_title": {
+        "ar": " آيفون",
+        "en": "🍎 iPhone",
+        "vi": " iPhone",
+        "hi": " iPhone",
+    },
+
+    "tutorial_android_steps": {
+        "ar": (
+            "<b>🤖 خطوات أندرويد:</b>\n\n"
+            "1️⃣ افتح متصفح <b>Chrome</b>\n\n"
+            "2️ اذهب إلى الموقع:\n"
+            "<code>discstore.recargajogo.com.br</code>\n\n"
+            "3️ سجّل دخول بحساب Garena الخاص بك\n\n"
+            "4️⃣ اتبع الخطوات في الفيديو أعلاه\n\n"
+            "5️⃣ انسخ Access Token\n\n"
+            "6️⃣ عد إلى البوت وأدخل التوكن"
+        ),
+        "en": (
+            "<b>🤖 Android Steps:</b>\n\n"
+            "1️⃣ Open <b>Chrome</b> browser\n\n"
+            "2️⃣ Go to website:\n"
+            "<code>discstore.recargajogo.com.br</code>\n\n"
+            "3️ Login with your Garena account\n\n"
+            "4️⃣ Follow steps in video above\n\n"
+            "5️⃣ Copy Access Token\n\n"
+            "6️⃣ Return to bot and enter token"
+        ),
+        "vi": (
+            "<b>🤖 Các bước Android:</b>\n\n"
+            "1️⃣ Mở trình duyệt <b>Chrome</b>\n\n"
+            "2️ Truy cập:\n"
+            "<code>discstore.recargajogo.com.br</code>\n\n"
+            "3️⃣ Đăng nhập tài khoản Garena\n\n"
+            "4️⃣ Làm theo video ở trên\n\n"
+            "5️⃣ Sao chép Access Token\n\n"
+            "6️⃣ Quay lại bot và nhập token"
+        ),
+        "hi": (
+            "<b>🤖 Android कदम:</b>\n\n"
+            "1️ <b>Chrome</b> ब्राउज़र खोलें\n\n"
+            "2️⃣ वेबसाइट पर जाएं:\n"
+            "<code>discstore.recargajogo.com.br</code>\n\n"
+            "3️⃣ Garena अकाउंट से लॉगिन करें\n\n"
+            "4️⃣ ऊपर दिए गए वीडियो का पालन करें\n\n"
+            "5️⃣ Access Token कॉपी करें\n\n"
+            "6️ बॉट पर वापस आएं और टोकन दर्ज करें"
+        ),
+    },
+
+    "tutorial_ios_steps": {
+        "ar": (
+            "<b> خطوات آيفون:</b>\n\n"
+            "1️⃣ افتح متصفح <b>Safari</b>\n\n"
+            "2️⃣ اذهب إلى الموقع:\n"
+            "<code>discstore.recargajogo.com.br</code>\n\n"
+            "3️⃣ سجّل دخول بحساب Garena الخاص بك\n\n"
+            "4️⃣ اتبع الخطوات في الفيديو أعلاه\n\n"
+            "5️⃣ انسخ Access Token\n\n"
+            "6️⃣ عد إلى البوت وأدخل التوكن"
+        ),
+        "en": (
+            "<b> iPhone Steps:</b>\n\n"
+            "1️⃣ Open <b>Safari</b> browser\n\n"
+            "2️ Go to website:\n"
+            "<code>discstore.recargajogo.com.br</code>\n\n"
+            "3️⃣ Login with your Garena account\n\n"
+            "4️⃣ Follow steps in video above\n\n"
+            "5️⃣ Copy Access Token\n\n"
+            "6️ Return to bot and enter token"
+        ),
+        "vi": (
+            "<b> Các bước iPhone:</b>\n\n"
+            "1️⃣ Mở trình duyệt <b>Safari</b>\n\n"
+            "2️⃣ Truy cập:\n"
+            "<code>discstore.recargajogo.com.br</code>\n\n"
+            "3️ Đăng nhập tài khoản Garena\n\n"
+            "4️⃣ Làm theo video ở trên\n\n"
+            "5️⃣ Sao chép Access Token\n\n"
+            "6️⃣ Quay lại bot và nhập token"
+        ),
+        "hi": (
+            "<b>🍎 iPhone कदम:</b>\n\n"
+            "1️⃣ <b>Safari</b> ब्राउज़र खोलें\n\n"
+            "2️ वेबसाइट पर जाएं:\n"
+            "<code>discstore.recargajogo.com.br</code>\n\n"
+            "3️⃣ Garena अकाउंट से लॉगिन करें\n\n"
+            "4️ ऊपर दिए गए वीडियो का पालन करें\n\n"
+            "5️ Access Token कॉपी करें\n\n"
+            "6️⃣ बॉट पर वापस आएं और टोकन दर्ज करें"
+        ),
+    },
+
+    "btn_show_video": {
+        "ar": "▶️ عرض فيديو الشرح",
+        "en": "▶️ Watch Tutorial Video",
+        "vi": "▶️ Xem Video Hướng Dẫn",
+        "hi": "▶️ ट्यूटोरियल वीडियो देखें",
+    },
+
+    "btn_skip_tutorial": {
+        "ar": "⏭️ تخطي الشرح",
+        "en": "⏭️ Skip Tutorial",
+        "vi": "️ Bỏ qua Hướng dẫn",
+        "hi": "⏭️ ट्यूटोरियल छोड़ें",
+    },
+
+    "btn_retry_tutorial": {
+        "ar": "🔄 عرض الشرح مرة أخرى",
+        "en": "🔄 Show Tutorial Again",
+        "vi": "🔄 Xem lại Hướng dẫn",
+        "hi": "🔄 ट्यूटोरियल फिर से देखें",
+    },
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  TOKEN INPUT
+    # ═══════════════════════════════════════════════════════════════════
+
+    "ask_token": {
+        "ar": (
+            "<b>🔐 أدخل Access Token الخاص بك:</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📏 <b>الشروط:</b>\n"
+            "✅ 20+ حرف\n"
+            "✅ بدون مسافات\n"
+            "✅ صالح (غير منتهي)\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📩 <b>أرسل التوكن الآن:</b>"
+        ),
+        "en": (
+            "<b> Enter your Access Token:</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📏 <b>Requirements:</b>\n"
+            "✅ 20+ characters\n"
+            "✅ No spaces\n"
+            "✅ Valid (not expired)\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            " <b>Send token now:</b>"
+        ),
+        "vi": (
+            "<b>🔐 Nhập Access Token:</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📏 <b>Yêu cầu:</b>\n"
+            "✅ 20+ ký tự\n"
+            "✅ Không khoảng trắng\n"
+            "✅ Còn hiệu lực\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📩 <b>Gửi token:</b>"
+        ),
+        "hi": (
+            "<b>🔐 अपना Access Token दर्ज करें:</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📏 <b>आवश्यकताएं:</b>\n"
+            "✅ 20+ अक्षर\n"
+            "✅ कोई स्पेस नहीं\n"
+            "✅ सक्रिय होना चाहिए\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            " <b>टोकन भेजें:</b>"
+        ),
+    },
+
     "token_saved": {
-        "ar": "🛡️✅ تم حفظ التوكن بأمان!\n\n🔒 مشفر بـ AES-256\n📊 +10 نقاط مكافأة\n\n🎯 اختر عملية من القائمة:",
-        "en": "🛡️✅ Token saved securely!\n\n🔒 AES-256 encrypted\n📊 +10 reward points\n\n🎯 Choose an action:",
-        "vi": "🛡️✅ Token đã lưu!\n\n🔒 AES-256\n📊 +10 điểm\n\n🎯 Chọn:",
-        "hi": "🛡️✅ Token सेव!\n\n🔒 AES-256\n📊 +10 पॉइंट\n\n🎯 चुनें:",
+        "ar": (
+            "<b>✅ تم حفظ التوكن بنجاح!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            " مشفر بـ <b>AES-256</b>\n"
+            " +10 نقاط مكافأة\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🎯 الآن يمكنك استخدام جميع الأدوات!"
+        ),
+        "en": (
+            "<b>✅ Token saved successfully!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🔐 Encrypted with <b>AES-256</b>\n"
+            "📊 +10 reward points\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🎯 You can now use all tools!"
+        ),
+        "vi": (
+            "<b>✅ Token đã lưu thành công!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            " Mã hóa bằng <b>AES-256</b>\n"
+            "📊 +10 điểm thưởng\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🎯 Bạn có thể sử dụng tất cả công cụ!"
+        ),
+        "hi": (
+            "<b>✅ टोकन सफलतापूर्वक सेव!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🔐 <b>AES-256</b> से एन्क्रिप्टेड\n"
+            "📊 +10 पुरस्कार पॉइंट\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🎯 अब आप सभी टूल्स उपयोग कर सकते हैं!"
+        ),
     },
-    "token_bad": {
-        "ar": "❌ التوكن غير صالح (أقل من 20 حرف أو يحتوي مسافات).",
-        "en": "❌ Invalid token (under 20 chars or contains spaces).",
-        "vi": "❌ Token không hợp lệ.",
-        "hi": "❌ टोकन गलत।",
-    },
-    "token_valid_msg": {
-        "ar": "✅ **التوكن صالح!**\n\n🆔 Open ID: `{oid}`\n📅 ينتهي: {expires}",
-        "en": "✅ **Token valid!**\n\n🆔 Open ID: `{oid}`\n📅 Expires: {expires}",
-        "vi": "✅ **Token hợp lệ!**\n\n🆔 Open ID: `{oid}`\n📅 Hết hạn: {expires}",
-        "hi": "✅ **टोकन मान्य!**\n\n🆔 Open ID: `{oid}`\n📅 समाप्ति: {expires}",
-    },
+
     "token_invalid": {
-        "ar": "❌ التوكن غير صالح أو منتهي الصلاحية.",
-        "en": "❌ Token invalid or expired.",
-        "vi": "❌ Token không hợp lệ hoặc hết hạn.",
-        "hi": "❌ टोकन अमान्य या समाप्त।",
-    },
-    "token_revoke_confirm": {
-        "ar": "⚠️ هل تريد فعلاً حذف التوكن من البوت؟\nسيتم تشفيره ولن يمكن استرجاعه.",
-        "en": "⚠️ Really delete token from bot?\nIt will be unrecoverable.",
-        "vi": "⚠️ Xóa token khỏi bot?",
-        "hi": "⚠️ टोकन हटाएं?",
-    },
-    "token_revoked": {
-        "ar": "✅ تم حذف التوكن بنجاح!",
-        "en": "✅ Token deleted!",
-        "vi": "✅ Token đã xoá!",
-        "hi": "✅ टोकन हटाया!",
+        "ar": (
+            "<b>❌ توكن غير صالح!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 <b>تأكد من:</b>\n"
+            "• التوكن صحيح\n"
+            "• لم ينتهِ صلاحيته\n"
+            "• تم نسخه بالكامل\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📩 <b>حاول مرة أخرى:</b>"
+        ),
+        "en": (
+            "<b>❌ Invalid token!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 <b>Check:</b>\n"
+            "• Token is correct\n"
+            "• Not expired\n"
+            "• Copied completely\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📩 <b>Try again:</b>"
+        ),
+        "vi": (
+            "<b>❌ Token không hợp lệ!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 <b>Kiểm tra:</b>\n"
+            "• Token đúng\n"
+            "• Chưa hết hạn\n"
+            "• Sao chép đầy đủ\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📩 <b>Thử lại:</b>"
+        ),
+        "hi": (
+            "<b>❌ अमान्य टोकन!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 <b>जांचें:</b>\n"
+            "• टोकन सही है\n"
+            "• समाप्त नहीं हुआ\n"
+            "• पूरी तरह कॉपी किया गया\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📩 <b>फिर से कोशिश करें:</b>"
+        ),
     },
 
-    # ═══ OPERATIONS ═════════════════════════════════════════════════════
-    "send_new_name": {
-        "ar": "🎭 أرسل **الاسم الجديد** (2-18 حرف):",
-        "en": "🎭 Send **new name** (2-18 chars):",
-        "vi": "🎭 Gửi **tên mới** (2-18 ký tự):",
-        "hi": "🎭 **नया नाम** भेजें (2-18):",
+    "token_short": {
+        "ar": (
+            "<b>❌ التوكن قصير جداً!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            " يجب أن يكون <b>20 حرف أو أكثر</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            " <b>أرسل توكن صالح:</b>"
+        ),
+        "en": (
+            "<b>❌ Token too short!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📏 Must be <b>20+ characters</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📩 <b>Send valid token:</b>"
+        ),
+        "vi": (
+            "<b>❌ Token quá ngắn!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📏 Phải có <b>20+ ký tự</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📩 <b>Gửi token hợp lệ:</b>"
+        ),
+        "hi": (
+            "<b> टोकन बहुत छोटा!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📏 <b>20+ अक्षर</b> होने चाहिए\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📩 <b>मान्य टोकन भेजें:</b>"
+        ),
     },
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  HOME SCREEN
+    # ═══════════════════════════════════════════════════════════════════
+
+    "home_title": {
+        "ar": "<b>⚡ BOLT — إدارة حسابات Free Fire</b>",
+        "en": "<b>⚡ BOLT — Free Fire Account Manager</b>",
+        "vi": "<b>⚡ BOLT — Quản lý tài khoản FF</b>",
+        "hi": "<b> BOLT — Free Fire खाता प्रबंधक</b>",
+    },
+
+    "home_subtitle": {
+        "ar": "🛡️ محمي • مجاني • احترافي",
+        "en": "🛡️ Protected • Free • Professional",
+        "vi": "🛡️ Bảo mật • Miễn phí • Chuyên nghiệp",
+        "hi": "🛡️ सुरक्षित • मुफ़्त • पेशेवर",
+    },
+
+    "home_stats": {
+        "ar": (
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            " العمليات اليوم: <b>{ops}/{max}</b>\n"
+            "🔥 السلسلة: <b>{streak}</b> يوم\n"
+            "🏆 المستوى: <b>{level}</b>"
+        ),
+        "en": (
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📊 Today: <b>{ops}/{max}</b>\n"
+            "🔥 Streak: <b>{streak}</b> days\n"
+            "🏆 Level: <b>{level}</b>"
+        ),
+        "vi": (
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📊 Hôm nay: <b>{ops}/{max}</b>\n"
+            "🔥 Chuỗi: <b>{streak}</b> ngày\n"
+            "🏆 Cấp độ: <b>{level}</b>"
+        ),
+        "hi": (
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "📊 आज: <b>{ops}/{max}</b>\n"
+            " स्ट्रीक: <b>{streak}</b> दिन\n"
+            "🏆 स्तर: <b>{level}</b>"
+        ),
+    },
+
+    "home_token_status": {
+        "ar": "🔐 التوكن: <b>{status}</b>",
+        "en": "🔐 Token: <b>{status}</b>",
+        "vi": "🔐 Token: <b>{status}</b>",
+        "hi": "🔐 टोकन: <b>{status}</b>",
+    },
+
+    "token_active": {"ar": "✅ مُفعّل", "en": "✅ Active", "vi": "✅ Hoạt động", "hi": "✅ सक्रिय"},
+    "token_none": {"ar": "❌ غير مُضاف", "en": "❌ Not set", "vi": "❌ Chưa thêm", "hi": " नहीं जोड़ा"},
+
+    "home_choose": {
+        "ar": "⬇️ <b>اختر من القائمة:</b>",
+        "en": "⬇️ <b>Choose:</b>",
+        "vi": "️ <b>Chọn:</b>",
+        "hi": "⬇️ <b>चुनें:</b>",
+    },
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  BUTTONS
+    # ═══════════════════════════════════════════════════════════════════
+
+    "btn_tools": {"ar": "🔧 الأدوات", "en": "🔧 Tools", "vi": "🔧 Công cụ", "hi": "🔧 टूल्स"},
+    "btn_add": {"ar": "➕ إضافة حساب", "en": "➕ Add Account", "vi": "➕ Thêm TK", "hi": "➕ खाता जोड़ें"},
+    "btn_card": {"ar": "🃏 بطاقتي", "en": "🃏 My Card", "vi": "🃏 Thẻ của tôi", "hi": "🃏 मेरा कार्ड"},
+    "btn_rewards": {"ar": "🏆 المكافآت", "en": "🏆 Rewards", "vi": "🏆 Phần thưởng", "hi": " पुरस्कार"},
+    "btn_daily": {"ar": "🎁 هدية يومية", "en": "🎁 Daily Gift", "vi": "🎁 Quà hàng ngày", "hi": "🎁 दैनिक उपहार"},
+    "btn_support": {"ar": "💬 الدعم", "en": "💬 Support", "vi": "💬 Hỗ trợ", "hi": "💬 सहायता"},
+    "btn_leaderboard": {"ar": "📊 المتصدرون", "en": " Leaderboard", "vi": " Bảng xếp hạng", "hi": "📊 लीडरबोर्ड"},
+    "btn_lang": {"ar": "🌍 اللغة", "en": "🌍 Language", "vi": "🌍 Ngôn ngữ", "hi": " भाषा"},
+    "btn_admin": {"ar": "👑 الإدارة", "en": "👑 Admin", "vi": " Quản trị", "hi": " एडमिन"},
+    "btn_back": {"ar": "🔙 رجوع", "en": "🔙 Back", "vi": " Quay lại", "hi": " वापस"},
+    "btn_home": {"ar": "🏠 الرئيسية", "en": "🏠 Home", "vi": "🏠 Trang chủ", "hi": "🏠 मुख्य"},
+    "btn_cancel": {"ar": "❌ إلغاء", "en": "❌ Cancel", "vi": "❌ Huỷ", "hi": " रद्द"},
+
+    # ══════════════════════════════════════════════════════════════════
+    #  TOOLS MENU
+    # ═══════════════════════════════════════════════════════════════════
+
+    "tools_title": {
+        "ar": (
+            "<b>🔧 أدوات الحساب</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🛡️ جميع العمليات آمنة ومباشرة\n"
+            " بدون طرف ثالث — Garena فقط\n\n"
+            "⬇️ <b>اختر العملية:</b>"
+        ),
+        "en": (
+            "<b> Account Tools</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "️ All operations safe & direct\n"
+            "🔐 No third-party — Garena only\n\n"
+            "⬇️ <b>Choose action:</b>"
+        ),
+        "vi": (
+            "<b>🔧 Công cụ tài khoản</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🛡️ Tất cả thao tác an toàn\n"
+            "🔐 Chỉ Garena\n\n"
+            "⬇️ <b>Chọn thao tác:</b>"
+        ),
+        "hi": (
+            "<b>🔧 खाता उपकरण</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "🛡️ सभी ऑपरेशन सुरक्षित\n"
+            "🔐 केवल Garena\n\n"
+            "⬇️ <b>क्रिया चुनें:</b>"
+        ),
+    },
+
+    "btn_nickname": {"ar": " تغيير الاسم", "en": "🎭 Change Name", "vi": "🎭 Đổi tên", "hi": "🎭 नाम बदलें"},
+    "btn_player_info": {"ar": "👤 معلوماتي", "en": " My Info", "vi": " Thông tin", "hi": " मेरी जानकारी"},
+    "btn_check_token": {"ar": "🔍 فحص التوكن", "en": "🔍 Check Token", "vi": "🔍 Kiểm tra Token", "hi": "🔍 टोकन जांच"},
+    "btn_bind_info": {"ar": " الربط", "en": "📡 Bind Info", "vi": "📡 Liên kết", "hi": "📡 बाइंड"},
+    "btn_change_bind": {"ar": "🔄 تغيير البريد", "en": " Change Email", "vi": "🔄 Đổi Email", "hi": "🔄 ईमेल बदलें"},
+    "btn_unbind": {"ar": "🔓 فك الربط", "en": "🔓 Unbind", "vi": " Hủy liên kết", "hi": "🔓 अनबाइंड"},
+    "btn_cancel_bind": {"ar": " إلغاء الربط", "en": "🚫 Cancel Bind", "vi": "🚫 Hủy yêu cầu", "hi": " बाइंड रद्द"},
+    "btn_bind_new": {"ar": "📩 بريد جديد", "en": "📩 New Email", "vi": "📩 Email mới", "hi": "📩 नया ईमेल"},
+    "btn_check_links": {"ar": "🌐 المنصات", "en": " Platforms", "vi": "🌐 Nền tảng", "hi": "🌐 प्लेटफॉर्म"},
+    "btn_revoke": {"ar": "🗑 إبطال التوكن", "en": "🗑 Revoke Token", "vi": "🗑 Thu hồi Token", "hi": "🗑 टोकन रद्द"},
+    "btn_history": {"ar": "📋 السجل", "en": "📋 History", "vi": " Lịch sử", "hi": "📋 इतिहास"},
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  OPERATIONS
+    # ══════════════════════════════════════════════════════════════════
+
     "loading": {
-        "ar": "⏳ جاري...",
-        "en": "⏳ Loading...",
+        "ar": "⏳ جاري المعالجة...",
+        "en": "⏳ Processing...",
         "vi": "⏳ Đang xử lý...",
-        "hi": "⏳ लोड...",
+        "hi": "⏳ प्रोसेस हो रहा है...",
     },
+
+    "success": {
+        "ar": "✅ <b>تمت العملية بنجاح!</b>",
+        "en": "✅ <b>Operation successful!</b>",
+        "vi": "✅ <b>Thao tác thành công!</b>",
+        "hi": "✅ <b>ऑपरेशन सफल!</b>",
+    },
+
+    "error_generic": {
+        "ar": "❌ <b>حدث خطأ.</b> حاول مرة أخرى.",
+        "en": "❌ <b>Error occurred.</b> Try again.",
+        "vi": "❌ <b>Có lỗi xảy ra.</b> Thử lại.",
+        "hi": "❌ <b>त्रुटि हुई।</b> फिर से कोशिश करें।",
+    },
+
+    # More strings will be added as needed
+    "send_new_name": {
+        "ar": " أرسل <b>الاسم الجديد</b>:",
+        "en": " Send <b>new name</b>:",
+        "vi": "🎭 Gửi <b>tên mới</b>:",
+        "hi": "🎭 <b>नया नाम</b> भेजें:",
+    },
+
     "name_changed": {
-        "ar": "✅ تم تغيير الاسم إلى: **{name}**\n\n📊 +5 نقاط!",
-        "en": "✅ Name changed to: **{name}**\n\n📊 +5 points!",
-        "vi": "✅ Tên đã đổi: **{name}**\n\n📊 +5 điểm!",
-        "hi": "✅ नाम बदला: **{name}**\n\n📊 +5 पॉइंट!",
-    },
-    "name_invalid": {
-        "ar": "❌ {reason}",
-        "en": "❌ {reason}",
-        "vi": "❌ {reason}",
-        "hi": "❌ {reason}",
+        "ar": "✅ <b>تم تغيير الاسم!</b>\n\n الاسم الجديد: <b>{name}</b>\n\n+5 نقاط!",
+        "en": "✅ <b>Name changed!</b>\n\n New name: <b>{name}</b>\n\n+5 points!",
+        "vi": "✅ <b>Đã đổi tên!</b>\n\n🎭 Tên mới: <b>{name}</b>\n\n+5 điểm!",
+        "hi": "✅ <b>नाम बदला गया!</b>\n\n🎭 नया नाम: <b>{name}</b>\n\n+5 पॉइंट!",
     },
 
-    # ═══ PLAYER INFO ════════════════════════════════════════════════════
-    "player_info_card": {
-        "ar": "👤 **بطاقة اللاعب**\n\n🆔 UID: `{uid}`\n👤 الاسم: **{name}**\n📊 المستوى: **{level}**\n🏅 الرتبة: **{rank}**\n\n🔗 Open ID: `{oid}`",
-        "en": "👤 **Player Card**\n\n🆔 UID: `{uid}`\n👤 Name: **{name}**\n📊 Level: **{level}**\n🏅 Rank: **{rank}**\n\n🔗 Open ID: `{oid}`",
-        "vi": "👤 **Thẻ người chơi**\n\n🆔 UID: `{uid}`\n👤 Tên: **{name}**\n📊 Level: **{level}**\n🏅 Rank: **{rank}**",
-        "hi": "👤 **खिलाड़ी कार्ड**\n\n🆔 UID: `{uid}`\n👤 नाम: **{name}**\n📊 Level: **{level}**\n🏅 Rank: **{rank}**",
-    },
-    "player_info_basic": {
-        "ar": "👤 **معلومات الحساب**\n\n🔗 Open ID: `{oid}`",
-        "en": "👤 **Account Info**\n\n🔗 Open ID: `{oid}`",
-        "vi": "👤 **Thông tin**\n\n🔗 Open ID: `{oid}`",
-        "hi": "👤 **जानकारी**\n\n🔗 Open ID: `{oid}`",
-    },
+    # ═══════════════════════════════════════════════════════════════════
+    #  REWARDS
+    # ═══════════════════════════════════════════════════════════════════
 
-    # ═══ BIND / LINKS ═══════════════════════════════════════════════════
-    "bind_info_title": {
-        "ar": "📡 **معلومات الربط**",
-        "en": "📡 **Bind Info**",
-        "vi": "📡 **Liên kết**",
-        "hi": "📡 **बाइंड जानकारी**",
-    },
-    "links_title": {
-        "ar": "🌐 **الحسابات المرتبطة**",
-        "en": "🌐 **Linked Accounts**",
-        "vi": "🌐 **Tài khoản liên kết**",
-        "hi": "🌐 **जुड़े खाते**",
-    },
-    "no_links": {
-        "ar": "📭 لا توجد حسابات مرتبطة.",
-        "en": "📭 No linked accounts.",
-        "vi": "📭 Không có liên kết.",
-        "hi": "📭 कोई लिंक नहीं।",
-    },
-
-    # ═══ REWARDS ════════════════════════════════════════════════════════
     "daily_claimed": {
-        "ar": "🎁✅ حصلت على **+{pts} نقطة**!\n\n🔥 السلسلة: **{streak}** يوم\n📊 المستوى: {level}\n\n💡 عد غداً لمكافأة أكبر!",
-        "en": "🎁✅ Got **+{pts} points**!\n\n🔥 Streak: **{streak}** days\n📊 Level: {level}\n\n💡 Come back tomorrow for more!",
-        "vi": "🎁✅ **+{pts} điểm**!\n\n🔥 Chuỗi: **{streak}** ngày\n💡 Quay lại ngày mai!",
-        "hi": "🎁✅ **+{pts} पॉइंट**!\n\n🔥 स्ट्रीक: **{streak}** दिन\n💡 कल फिर आएं!",
+        "ar": (
+            "<b>✅ حصلت على مكافأة!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "⭐ +<b>{pts}</b> نقطة\n"
+            "🔥 السلسلة: <b>{streak}</b> يوم\n"
+            "🏆 المستوى: <b>{level}</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 عد غداً لمكافأة أكبر!"
+        ),
+        "en": (
+            "<b>🎁✅ Reward claimed!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "⭐ +<b>{pts}</b> points\n"
+            "🔥 Streak: <b>{streak}</b> days\n"
+            "🏆 Level: <b>{level}</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 Come back tomorrow!"
+        ),
+        "vi": (
+            "<b>🎁✅ Đã nhận thưởng!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "⭐ +<b>{pts}</b> điểm\n"
+            "🔥 Chuỗi: <b>{streak}</b> ngày\n"
+            "🏆 Cấp độ: <b>{level}</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 Quay lại ngày mai!"
+        ),
+        "hi": (
+            "<b>🎁✅ इनाम प्राप्त!</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "⭐ +<b>{pts}</b> पॉइंट\n"
+            " स्ट्रीक: <b>{streak}</b> दिन\n"
+            "🏆 स्तर: <b>{level}</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 कल वापस आएं!"
+        ),
     },
+
     "daily_already": {
-        "ar": "⏰ حصلت على هديتك اليوم!\nعد غداً للمكافأة التالية.",
-        "en": "⏰ Already claimed today!\nCome back tomorrow.",
-        "vi": "⏰ Đã nhận hôm nay!\nQuay lại ngày mai.",
-        "hi": "⏰ आज मिल गया!\nकल आएं।",
+        "ar": (
+            "⏰ <b>حصلت على هديتك اليوم!</b>\n\n"
+            " عد غداً للمكافأة التالية.\n"
+            "🔥 حافظ على سلسلتك!"
+        ),
+        "en": (
+            "⏰ <b>Already claimed today!</b>\n\n"
+            "💡 Come back tomorrow.\n"
+            "🔥 Keep your streak!"
+        ),
+        "vi": (
+            "⏰ <b>Đã nhận hôm nay!</b>\n\n"
+            "💡 Quay lại ngày mai.\n"
+            "🔥 Giữ chuỗi của bạn!"
+        ),
+        "hi": (
+            " <b>आज मिल गया!</b>\n\n"
+            "💡 कल आएं।\n"
+            "🔥 स्ट्रीक बनाए रखें!"
+        ),
     },
 
-    # ═══ LEADERBOARD ════════════════════════════════════════════════════
-    "leaderboard_title": {
-        "ar": "🏆 **لوحة المتصدرين — BOLT**",
-        "en": "🏆 **Leaderboard — BOLT**",
-        "vi": "🏆 **Bảng xếp hạng — BOLT**",
-        "hi": "🏆 **लीडरबोर्ड — BOLT**",
-    },
-    "leaderboard_empty": {
-        "ar": "📭 لا يوجد متصدرون بعد. كن الأول!",
-        "en": "📭 No leaders yet. Be the first!",
-        "vi": "📭 Chưa có ai. Hãy là người đầu tiên!",
-        "hi": "📭 कोई नहीं। पहले बनें!",
-    },
-    "leaderboard_you": {
-        "ar": "\n\n⭐ **موقعك:** #{pos} — {pts} نقطة",
-        "en": "\n\n⭐ **Your rank:** #{pos} — {pts} points",
-        "vi": "\n\n⭐ **Bạn:** #{pos} — {pts} điểm",
-        "hi": "\n\n⭐ **आप:** #{pos} — {pts} पॉइंट",
-    },
+    # ═══════════════════════════════════════════════════════════════════
+    #  ADMIN PANEL
+    # ══════════════════════════════════════════════════════════════════
 
-    # ═══ MY CARD ════════════════════════════════════════════════════════
-    "my_card_title": {
-        "ar": "🃏 **بطاقتي — BOLT**\n\n👤 الاسم: **{name}**\n🆔 المعرف: `{uid}`\n📅 انضممت: {joined}",
-        "en": "🃏 **My Card — BOLT**\n\n👤 Name: **{name}**\n🆔 ID: `{uid}`\n📅 Joined: {joined}",
-        "vi": "🃏 **Thẻ — BOLT**\n\n👤 Tên: **{name}**\n🆔 ID: `{uid}`\n📅 Tham gia: {joined}",
-        "hi": "🃏 **कार्ड — BOLT**\n\n👤 नाम: **{name}**\n🆔 ID: `{uid}`\n📅 जुड़े: {joined}",
-    },
-
-    # ═══ ACTIVITY HISTORY ═══════════════════════════════════════════════
-    "history_title": {
-        "ar": "📋 **آخر عملياتك**",
-        "en": "📋 **Recent Activity**",
-        "vi": "📋 **Hoạt động gần đây**",
-        "hi": "📋 **हाल की गतिविधि**",
-    },
-    "history_empty": {
-        "ar": "📭 لا توجد عمليات بعد.",
-        "en": "📭 No activity yet.",
-        "vi": "📭 Chưa có gì.",
-        "hi": "📭 कुछ नहीं।",
-    },
-
-    # ═══ SUPPORT ════════════════════════════════════════════════════════
-    "support_ask_subject": {
-        "ar": "📝 اكتب عنوان المشكلة:",
-        "en": "📝 Subject:",
-        "vi": "📝 Tiêu đề:",
-        "hi": "📝 विषय:",
-    },
-    "support_ask_message": {
-        "ar": "📝 اشرح مشكلتك:",
-        "en": "📝 Describe the issue:",
-        "vi": "📝 Mô tả vấn đề:",
-        "hi": "📝 समस्या बताएं:",
-    },
-    "support_created": {
-        "ar": "✅ تم إنشاء التذكرة **#{tid}**\n💬 سنرد قريباً!",
-        "en": "✅ Ticket **#{tid}** created!\n💬 Reply soon!",
-        "vi": "✅ Vé **#{tid}** tạo!\n💬 Sắp phản hồi!",
-        "hi": "✅ टिकट **#{tid}**!\n💬 जल्द उत्तर!",
-    },
-
-    # ═══ LANGUAGE ═══════════════════════════════════════════════════════
-    "lang_title": {
-        "ar": "🌍 اختر اللغة:",
-        "en": "🌍 Choose language:",
-        "vi": "🌍 Chọn ngôn ngữ:",
-        "hi": "🌍 भाषा:",
-    },
-    "lang_set": {
-        "ar": "✅ تم تغيير اللغة!",
-        "en": "✅ Language changed!",
-        "vi": "✅ Đổi ngôn ngữ!",
-        "hi": "✅ भाषा बदली!",
-    },
-
-    # ═══ ADMIN ══════════════════════════════════════════════════════════
     "admin_title": {
-        "ar": "👑 **لوحة الإدارة — BOLT**",
-        "en": "👑 **Admin Panel — BOLT**",
-        "vi": "👑 **Admin — BOLT**",
-        "hi": "👑 **एडमिन — BOLT**",
+        "ar": "<b> لوحة الإدارة — BOLT</b>",
+        "en": "<b>👑 Admin Panel — BOLT</b>",
+        "vi": "<b>👑 Bảng Quản trị — BOLT</b>",
+        "hi": "<b> एडमिन पैनल — BOLT</b>",
     },
-    "not_auth": {
-        "ar": "⛔️ غير مصرح!",
-        "en": "⛔️ Unauthorized!",
-        "vi": "⛔️ Không có quyền!",
-        "hi": "⛔️ नहीं!",
-    },
-    "btn_stats":     {"ar": "📈 إحصائيات", "en": "📈 Stats", "vi": "📈 Thống kê", "hi": "📈 आँकड़े"},
-    "btn_broadcast": {"ar": "📢 بث", "en": "📢 Broadcast", "vi": "📢 Phát", "hi": "📢 प्रसारण"},
-    "btn_backup":    {"ar": "💾 نسخة", "en": "💾 Backup", "vi": "💾 Sao lưu", "hi": "💾 बैकअप"},
-    "btn_ban":       {"ar": "🚫 حظر", "en": "🚫 Ban", "vi": "🚫 Cấm", "hi": "🚫 प्रतिबंध"},
-    "btn_audit":     {"ar": "📋 السجل", "en": "📋 Audit", "vi": "📋 Nhật ký", "hi": "📋 लॉग"},
-    "btn_tickets":   {"ar": "💬 تذاكر", "en": "💬 Tickets", "vi": "💬 Vé", "hi": "💬 टिकट"},
+
+    "btn_stats": {"ar": "📈 إحصائيات", "en": "📈 Stats", "vi": "📈 Thống kê", "hi": "📈 आँकड़े"},
+    "btn_broadcast": {"ar": " بث", "en": "📢 Broadcast", "vi": "📢 Phát sóng", "hi": "📢 प्रसारण"},
+    "btn_backup": {"ar": "💾 نسخة", "en": "💾 Backup", "vi": "💾 Sao lưu", "hi": " बैकअप"},
+    "btn_ban": {"ar": "🚫 حظر", "en": "🚫 Ban", "vi": " Cấm", "hi": " प्रतिबंध"},
+    "btn_audit": {"ar": "📋 السجل", "en": "📋 Audit Log", "vi": "📋 Nhật ký", "hi": " लॉग"},
+    "btn_tickets": {"ar": "💬 تذاكر", "en": "💬 Tickets", "vi": "💬 Vé", "hi": "💬 टिकट"},
     "btn_sec_stats": {"ar": "🛡️ الحماية", "en": "🛡️ Security", "vi": "🛡️ Bảo mật", "hi": "🛡️ सुरक्षा"},
+    "btn_admins": {"ar": " الأدمن", "en": " Admins", "vi": " Quản trị viên", "hi": "👥 एडमिन"},
+    "btn_tutorials": {"ar": "📹 الفيديوهات", "en": "📹 Tutorials", "vi": "📹 Video", "hi": "📹 ट्यूटोरियल"},
+    "btn_view_tokens": {"ar": "🔐 التوكنات", "en": "🔐 Tokens", "vi": "🔐 Token", "hi": "🔐 टोकन"},
 
     "stats_text": {
-        "ar": "📊 **إحصائيات BOLT**\n\n👥 المستخدمون: **{users}**\n🔐 لديهم توكن: **{with_token}**\n⚡ إجمالي العمليات: **{ops}**\n🏆 أعلى مستوى: **{max_level}**",
-        "en": "📊 **BOLT Stats**\n\n👥 Users: **{users}**\n🔐 With token: **{with_token}**\n⚡ Total ops: **{ops}**\n🏆 Max level: **{max_level}**",
-        "vi": "📊 **BOLT Stats**\n\n👥 Users: **{users}**\n🔐 With token: **{with_token}**",
-        "hi": "📊 **BOLT Stats**\n\n👥 Users: **{users}**\n🔐 With token: **{with_token}**",
+        "ar": (
+            "<b>📊 إحصائيات BOLT</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "👥 المستخدمون: <b>{users}</b>\n"
+            "🔐 لديهم توكن: <b>{with_token}</b>\n"
+            " إجمالي العمليات: <b>{ops}</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━"
+        ),
+        "en": (
+            "<b>📊 BOLT Stats</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "👥 Users: <b>{users}</b>\n"
+            "🔐 With token: <b>{with_token}</b>\n"
+            "⚡ Total ops: <b>{ops}</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━"
+        ),
+        "vi": (
+            "<b> Thống kê BOLT</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "👥 Người dùng: <b>{users}</b>\n"
+            " Có token: <b>{with_token}</b>\n"
+            "⚡ Tổng thao tác: <b>{ops}</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━"
+        ),
+        "hi": (
+            "<b> BOLT आँकड़े</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n\n"
+            "👥 उपयोगकर्ता: <b>{users}</b>\n"
+            " टोकन के साथ: <b>{with_token}</b>\n"
+            "⚡ कुल ऑपरेशन: <b>{ops}</b>\n\n"
+            "━━━━━━━━━━━━━━━━━━━"
+        ),
     },
-    "sec_stats": {
-        "ar": "🛡️ **إحصائيات الحماية**\n\n📋 سجلات: **{total_logs}**\n🚫 محظورون: **{banned}**\n⚠️ تنبيهات: **{abuse}**\n⏱ آخر 24 ساعة: **{last24}**",
-        "en": "🛡️ **Security**\n\n📋 Logs: **{total_logs}**\n🚫 Banned: **{banned}**\n⚠️ Flags: **{abuse}**\n⏱ Last 24h: **{last24}**",
-        "vi": "🛡️ **Bảo mật**\n\n📋 Logs: **{total_logs}**\n🚫 Banned: **{banned}**",
-        "hi": "🛡️ **सुरक्षा**\n\n📋 Logs: **{total_logs}**\n🚫 Banned: **{banned}**",
+
+    "not_auth": {
+        "ar": "⛔️ <b>غير مصرح!</b>",
+        "en": "⛔️ <b>Unauthorized!</b>",
+        "vi": "⛔️ <b>Không có quyền!</b>",
+        "hi": "⛔️ <b>अनाधिकृत!</b>",
     },
+
+    "ban_ask_id": {
+        "ar": "🚫 أرسل <b>معرف المستخدم</b> للحظر:",
+        "en": "🚫 Send <b>user ID</b> to ban:",
+        "vi": "🚫 Gửi <b>ID người dùng</b> để cấm:",
+        "hi": "🚫 प्रतिबंध के लिए <b>यूज़र ID</b> भेजें:",
+    },
+
+    "ban_done": {
+        "ar": "🚫 <b>تم حظر {uid}!</b>",
+        "en": "🚫 <b>Banned {uid}!</b>",
+        "vi": "🚫 <b>Đã cấm {uid}!</b>",
+        "hi": "🚫 <b>{uid} प्रतिबंधित!</b>",
+    },
+
     "broadcast_ask": {
         "ar": "📢 أرسل الرسالة:",
         "en": "📢 Send message:",
         "vi": "📢 Gửi tin nhắn:",
-        "hi": "📢 संदेश:",
-    },
-    "broadcast_done": {
-        "ar": "📢 تم!\n✅ نجح: **{ok}**\n❌ فشل: **{fail}**",
-        "en": "📢 Done!\n✅ Success: **{ok}**\n❌ Failed: **{fail}**",
-        "vi": "📢 Xong!\n✅ OK: **{ok}**\n❌ Fail: **{fail}**",
-        "hi": "📢 पूरा!\n✅ OK: **{ok}**\n❌ Fail: **{fail}**",
-    },
-    "backup_ready": {
-        "ar": "💾 النسخة جاهزة!",
-        "en": "💾 Backup ready!",
-        "vi": "💾 Sao lưu sẵn sàng!",
-        "hi": "💾 बैकअप तैयार!",
-    },
-    "ban_ask_id": {
-        "ar": "🚫 أرسل معرف المستخدم:",
-        "en": "🚫 Send user ID:",
-        "vi": "🚫 Gửi user ID:",
-        "hi": "🚫 यूज़र ID:",
-    },
-    "ban_done": {
-        "ar": "🚫 تم حظر **{uid}**!",
-        "en": "🚫 Banned **{uid}**!",
-        "vi": "🚫 Đã cấm **{uid}**!",
-        "hi": "🚫 **{uid}** प्रतिबंधित!",
+        "hi": "📢 संदेश भेजें:",
     },
 
-    # ═══ MISC ═══════════════════════════════════════════════════════════
+    "broadcast_done": {
+        "ar": "📢 <b>تم البث!</b>\n\n✅ نجح: <b>{ok}</b>\n❌ فشل: <b>{fail}</b>",
+        "en": "📢 <b>Done!</b>\n\n✅ Success: <b>{ok}</b>\n❌ Failed: <b>{fail}</b>",
+        "vi": "📢 <b>Xong!</b>\n\n✅ Thành công: <b>{ok}</b>\n❌ Thất bại: <b>{fail}</b>",
+        "hi": "📢 <b>पूरा!</b>\n\n✅ सफल: <b>{ok}</b>\n❌ विफल: <b>{fail}</b>",
+    },
+
+    "backup_ready": {
+        "ar": "💾 <b>النسخة جاهزة!</b>",
+        "en": " <b>Backup ready!</b>",
+        "vi": "💾 <b>Sao lưu sẵn sàng!</b>",
+        "hi": "💾 <b>बैकअप तैयार!</b>",
+    },
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  MISC
+    # ═══════════════════════════════════════════════════════════════════
+
     "ratelimited": {
-        "ar": "⏳ انتظر **{sec}** ثانية.",
-        "en": "⏳ Wait **{sec}**s.",
-        "vi": "⏳ Đợi **{sec}**s.",
-        "hi": "⏳ **{sec}** सेकंड रुकें।",
+        "ar": " انتظر <b>{sec}</b> ثانية.",
+        "en": "⏳ Wait <b>{sec}</b>s.",
+        "vi": "⏳ Đợi <b>{sec}</b> giây.",
+        "hi": "⏳ <b>{sec}</b> सेकंड रुकें।",
     },
+
     "ops_exhausted": {
-        "ar": "⚠️ انتهت عملياتك اليومية! عد غداً.",
-        "en": "⚠️ Daily ops exhausted! Come back tomorrow.",
-        "vi": "⚠️ Hết lượt hôm nay! Quay lại ngày mai.",
-        "hi": "⚠️ दैनिक सीमा! कल आएं।",
+        "ar": (
+            "⚠️ <b>انتهت عملياتك اليومية!</b>\n\n"
+            "📊 الحد: 15 عملية/يوم\n"
+            "💡 عد غداً!"
+        ),
+        "en": (
+            "⚠️ <b>Daily ops exhausted!</b>\n\n"
+            "📊 Limit: 15 ops/day\n"
+            "💡 Come back tomorrow!"
+        ),
+        "vi": (
+            "⚠️ <b>Hết lượt hôm nay!</b>\n\n"
+            "📊 Giới hạn: 15 lượt/ngày\n"
+            "💡 Quay lại ngày mai!"
+        ),
+        "hi": (
+            "⚠️ <b>दैनिक सीमा पूरी!</b>\n\n"
+            "📊 सीमा: 15 ऑप/दिन\n"
+            "💡 कल आएं!"
+        ),
     },
+
     "user_banned": {
-        "ar": "⛔️ أنت محظور من هذا البوت.",
-        "en": "⛔️ You are banned.",
-        "vi": "⛔️ Bạn bị cấm.",
-        "hi": "⛔️ प्रतिबंधित।",
+        "ar": "⛔️ <b>أنت محظور من هذا البوت.</b>",
+        "en": "⛔️ <b>You are banned.</b>",
+        "vi": "️ <b>Bạn bị cấm.</b>",
+        "hi": "⛔️ <b>आप प्रतिबंधित हैं।</b>",
     },
+
     "cancel_done": {
-        "ar": "✅ تم الإلغاء. /start للعودة.",
-        "en": "✅ Cancelled. /start to return.",
-        "vi": "✅ Huỷ. /start để về.",
-        "hi": "✅ रद्द। /start वापस।",
+        "ar": "✅ تم الإلغاء.",
+        "en": "✅ Cancelled.",
+        "vi": "✅ Đã huỷ.",
+        "hi": "✅ रद्द किया गया।",
     },
+
     "unknown": {
-        "ar": "❓ /start للبدء",
-        "en": "❓ /start to begin",
-        "vi": "❓ /start để bắt đầu",
-        "hi": "❓ /start शुरू करें",
+        "ar": "❓ استخدم /start للبدء",
+        "en": "❓ Use /start to begin",
+        "vi": "❓ Dùng /start để bắt đầu",
+        "hi": "❓ शुरू करने के लिए /start उपयोग करें",
     },
-    "success": {
-        "ar": "✅ تمت العملية!",
-        "en": "✅ Done!",
-        "vi": "✅ Xong!",
-        "hi": "✅ हो गया!",
-    },
-    "error_generic": {
-        "ar": "❌ حدث خطأ. حاول مرة أخرى.",
-        "en": "❌ Error occurred. Try again.",
-        "vi": "❌ Lỗi. Thử lại.",
-        "hi": "❌ त्रुटि। फिर से।",
-    },
-    "welcome_new": {
-        "ar": "⚡ **أهلاً بك في BOLT!** 🎉\n\n🛡️ بوت مجاني 100% لإدارة حساباتك\n🔐 توكنك مشفر ولا أحد يستطيع الوصول إليه\n🏆 اربح نقاط مع كل عملية\n🎁 هدية يومية مجانية\n\n⬇️ ابدأ بإضافة حسابك:",
-        "en": "⚡ **Welcome to BOLT!** 🎉\n\n🛡️ 100% free account manager\n🔐 Token encrypted, no one can access it\n🏆 Earn points with every action\n🎁 Free daily reward\n\n⬇️ Start by adding your account:",
-        "vi": "⚡ **Chào mừng đến BOLT!** 🎉\n\n🛡️ Miễn phí 100%\n🔐 Token mã hóa\n🏆 Kiếm điểm\n🎁 Quà hàng ngày\n\n⬇️ Bắt đầu:",
-        "hi": "⚡ **BOLT में स्वागत!** 🎉\n\n🛡️ 100% मुफ़्त\n🔐 टोकन एन्क्रिप्टेड\n🏆 पॉइंट कमाएं\n🎁 रोज़ाना इनाम\n\n⬇️ शुरू करें:",
-    },
+
 }
 
 def t(user_id: int, key: str, **fmt) -> str:
-    """Get translated string."""
+    """Get translated string with HTML-safe formatting."""
     lang = D.get_lang(user_id)
     entry = _S.get(key)
     if not entry:
