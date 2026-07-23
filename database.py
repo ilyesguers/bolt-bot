@@ -1,26 +1,47 @@
 """
-BOLT  — Database Module
+BOLT  — Database Module — FIXED FOR RAILWAY PERSISTENCE
  Users, Tokens, Rewards, Activity
  Admins Management
  Tutorial Videos
- Bans (permanent/temporary with reason)
+ Bans
 """
-
 import os
 import sqlite3
 import threading
 from datetime import datetime, timedelta, timezone
 from crypto_utils import encrypt_token, decrypt_token, token_fingerprint
 
-DB_FILE = os.environ.get("DB_PATH", "bolt.db")
+# FIX: Support Railway Volume /data and local fallback
+def _get_db_path():
+    # Priority: ENV -> /data volume (Railway) -> local
+    env_path = os.environ.get("DB_PATH")
+    if env_path:
+        return env_path
+    # Railway volume mount is /data
+    if os.path.isdir("/data"):
+        # Ensure /data exists writable
+        try:
+            test = "/data/.write_test"
+            with open(test, "w") as f: f.write("ok")
+            os.remove(test)
+            return "/data/bolt.db"
+        except:
+            pass
+    return "bolt.db"
+
+DB_FILE = _get_db_path()
 _lock = threading.Lock()
 
 
 def _conn() -> sqlite3.Connection:
-    c = sqlite3.connect(DB_FILE)
+    dirn = os.path.dirname(DB_FILE)
+    if dirn and not os.path.exists(dirn):
+        os.makedirs(dirn, exist_ok=True)
+    c = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA journal_mode=WAL")
     c.execute("PRAGMA foreign_keys=ON")
+    c.execute("PRAGMA synchronous=NORMAL")
     return c
 
 
@@ -31,7 +52,6 @@ def _now() -> str:
 # ─── Init ─────────────────────────────────────────────────────────────────────
 
 def init_db():
-    """Create all tables."""
     with _lock:
         c = _conn()
         c.executescript("""
@@ -119,7 +139,6 @@ def init_db():
         """)
         c.commit()
 
-        # Initialize tutorial videos if not exist
         existing = c.execute("SELECT COUNT(*) FROM tutorial_videos").fetchone()[0]
         if existing == 0:
             now = _now()
@@ -128,13 +147,14 @@ def init_db():
             c.execute("INSERT INTO tutorial_videos (platform, video_url, updated_by, updated_at) VALUES (?, ?, ?, ?)",
                       ("ios", "https://example.com/ios-tutorial.mp4", 0, now))
 
+        c.commit()
         c.close()
+        print(f"✅ DB initialized at {DB_FILE}")
 
 
 # ─── User Management ──────────────────────────────────────────────────────────
 
 def ensure_user(user_id: int, username: str = "", first_name: str = "") -> dict:
-    """Create user if new, update last_active."""
     now = _now()
     with _lock:
         c = _conn()
@@ -211,7 +231,11 @@ def get_token(user_id: int) -> str | None:
         c.close()
     if not row or not row["encrypted_token"]:
         return None
-    return decrypt_token(row["encrypted_token"])
+    try:
+        return decrypt_token(row["encrypted_token"])
+    except Exception as e:
+        print(f"Decrypt failed for {user_id}: {e} - ENCRYPTION_KEY changed?")
+        return None
 
 
 def clear_token(user_id: int):
@@ -392,9 +416,7 @@ def get_bans(limit: int = 50) -> list[dict]:
 
 DAILY_OP_LIMIT = 15
 
-
 def check_daily_ops(user_id: int) -> tuple[bool, int, int]:
-    """Returns (allowed, remaining, limit)."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     with _lock:
         c = _conn()
@@ -415,7 +437,6 @@ def check_daily_ops(user_id: int) -> tuple[bool, int, int]:
 
 
 def peek_daily_ops(user_id: int) -> tuple[int, int]:
-    """Returns (remaining, limit) WITHOUT consuming an op."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     with _lock:
         c = _conn()
@@ -468,7 +489,7 @@ def get_rewards(user_id: int) -> dict:
     return dict(row) if row else {"user_id": user_id, "points": 0, "level": 1, "streak": 0, "last_daily": "", "total_earned": 0}
 
 
-def add_points(user_id: int, points: int, action: str, detail: str = ""):
+def add_points(user_id: int, points: int, action: str = "", detail: str = ""):
     with _lock:
         c = _conn()
         c.execute("UPDATE rewards SET points=points+?, total_earned=total_earned+? WHERE user_id=?",
@@ -591,6 +612,7 @@ def export_data() -> dict:
             "tickets": [dict(r) for r in c.execute("SELECT * FROM support_tickets").fetchall()],
             "bans": [dict(r) for r in c.execute("SELECT * FROM bans WHERE is_active=1").fetchall()],
             "exported_at": _now(),
+            "db_path": DB_FILE,
         }
         c.close()
     return data
