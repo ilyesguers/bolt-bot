@@ -1,9 +1,7 @@
 """
 BOLT ⚡ — Garena API Module
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🛡️ ONLY direct Garena APIs — no third-party Vercel endpoints
+️ ONLY direct Garena APIs — no third-party Vercel endpoints
 ✅ Clean, validated, timeout-protected
-📡 Operations: login, name change, bind info, links check, token validation
 """
 
 import ssl
@@ -20,11 +18,8 @@ from Crypto.Util.Padding import pad
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logger = logging.getLogger("bolt.garena")
 
-# ─── Constants ────────────────────────────────────────────────────────────────
-
-_K  = b'Yg&tc%DEuh6%Zc^8'
+_K = b'Yg&tc%DEuh6%Zc^8'
 _IV = b'6oyZDr22E3ychjM%'
-
 _TIMEOUT = 15
 
 _HR = {
@@ -44,7 +39,7 @@ PLATFORM_NAMES = {
     18: "Riot", 100: "Steam",
 }
 
-# ─── Protobuf Helpers ─────────────────────────────────────────────────────────
+# ─── Protobuf Helpers ────────────────────────────────────────────────────────
 
 def _vr(n):
     r = []
@@ -95,7 +90,7 @@ def _pb1s(val):
     e = val.encode()
     return _vr(0x0A) + _vr(len(e)) + e + bytes([0x10, 0x01])
 
-# ─── Device Template ──────────────────────────────────────────────────────────
+# ─── Device Template ────────────────────────────────────────────────────────
 
 _dT = bytes.fromhex(
     '1a13323032352d30372d33302031343a31313a3230220966726565206669726528013a07'
@@ -130,11 +125,10 @@ _OID_PH = b'4306245793de86da425a52caadf21eed'
 _TS_PH = b'2025-07-30 14:11:20'
 
 
-# ─── Core Garena Functions (DIRECT — no third-party) ──────────────────────────
+# ─── Core Garena Functions ─────────────────────────────────────────────────
 
 def _garena_request(url: str, params: dict = None, method: str = "GET",
                      body: bytes = None, headers: dict = None, timeout: int = None) -> dict:
-    """Safe Garena API request with error handling."""
     timeout = timeout or _TIMEOUT
     try:
         if method == "GET":
@@ -143,7 +137,6 @@ def _garena_request(url: str, params: dict = None, method: str = "GET",
         else:
             r = requests.post(url, data=body, params=params, verify=False,
                               headers=headers or _HR, timeout=timeout)
-        # Handle gzip
         content = r.content
         if r.headers.get('Content-Encoding') == 'gzip':
             content = gzip.GzipFile(fileobj=BytesIO(content)).read()
@@ -160,7 +153,6 @@ def _garena_request(url: str, params: dict = None, method: str = "GET",
 
 
 def get_open_id(access_token: str) -> str | None:
-    """Resolve access_token → open_id (DIRECT Garena API)."""
     data = _garena_request(
         'https://100067.connect.garena.com/oauth/token/inspect',
         params={'token': access_token}
@@ -169,7 +161,6 @@ def get_open_id(access_token: str) -> str | None:
 
 
 def validate_token(access_token: str) -> dict:
-    """Validate token with Garena — DIRECT call."""
     data = _garena_request(
         'https://100067.connect.garena.com/oauth/token/inspect',
         params={'token': access_token}
@@ -185,7 +176,6 @@ def validate_token(access_token: str) -> dict:
 
 
 def major_login(payload: bytes) -> bytes:
-    """Direct MajorLogin to Garena servers."""
     try:
         ctx = ssl._create_unverified_context()
         c = http.client.HTTPSConnection('loginbp.ggpolarbear.com', timeout=_TIMEOUT, context=ctx)
@@ -209,13 +199,9 @@ def build_login_payload(access_token: str, open_id: str) -> bytes:
     return _enc(dT)
 
 
-# ─── Player Info (DIRECT) ─────────────────────────────────────────────────────
+# ─── Player Info ─────────────────────────────────────────────────────────────
 
 def get_player_info(access_token: str) -> dict:
-    """
-    Get player information — DIRECT Garena API calls only.
-    No third-party APIs involved.
-    """
     try:
         oid = get_open_id(access_token)
         if not oid:
@@ -237,7 +223,6 @@ def get_player_info(access_token: str) -> dict:
 
         player = {'status': 'success', 'open_id': oid}
 
-        # GetLoginData — direct Garena call
         if url:
             try:
                 r = requests.post(
@@ -268,10 +253,9 @@ def get_player_info(access_token: str) -> dict:
         return {'error': str(e)}
 
 
-# ─── Change Name (DIRECT) ─────────────────────────────────────────────────────
+# ─── Change Name ─────────────────────────────────────────────────────────────
 
 def change_name(access_token: str, new_name: str) -> dict:
-    """Change in-game nickname — DIRECT Garena API."""
     try:
         oid = get_open_id(access_token)
         if not oid:
@@ -287,7 +271,6 @@ def change_name(access_token: str, new_name: str) -> dict:
         k = mlr[22] if 22 in mlr else _K
         iv = mlr[23] if 23 in mlr else _IV
 
-        # GetLoginData
         try:
             requests.post(
                 f'{mlr[10].decode()}/GetLoginData', data=pyl,
@@ -309,10 +292,9 @@ def change_name(access_token: str, new_name: str) -> dict:
         return {'error': str(e)}
 
 
-# ─── Check Links (DIRECT Garena API) ──────────────────────────────────────────
+# ─── Check Links ─────────────────────────────────────────────────────────────
 
 def check_links(access_token: str) -> dict:
-    """Check platform links — DIRECT Garena API."""
     return _garena_request(
         'https://100067.connect.garena.com/bind/app/platform/info/get',
         params={'access_token': access_token},
@@ -324,25 +306,22 @@ def check_links(access_token: str) -> dict:
     )
 
 
-# ─── Bind Info (DIRECT Garena API) ────────────────────────────────────────────
+# ─── Bind Info ──────────────────────────────────────────────────────────────
 
 def check_bind_info_direct(access_token: str) -> dict:
-    """
-    Check email bind info — DIRECT Garena API.
-    Uses the official Garena crown endpoint.
-    """
     return _garena_request(
         'https://100067.connect.garena.com/bind/app/get_email',
         params={'access_token': access_token}
     )
 
 
-# ─── Utility ──────────────────────────────────────────────────────────────────
+# ─── Utility ─────────────────────────────────────────────────────────────────
 
 def is_success(response: dict) -> bool:
     if response.get('error'):
         return False
     return response.get('success', response.get('status', 0)) in (True, 1, 200)
+
 
 def extract_error(response: dict) -> str:
     if response.get('error'):
@@ -352,20 +331,3 @@ def extract_error(response: dict) -> str:
     if response.get('message'):
         return str(response['message'])
     return str(response)
-
-def convert_seconds(seconds) -> str:
-    try:
-        seconds = int(seconds)
-    except:
-        return "0s"
-    if seconds <= 0:
-        return "0s"
-    d, r = divmod(seconds, 86400)
-    h, r = divmod(r, 3600)
-    m, s = divmod(r, 60)
-    parts = []
-    if d: parts.append(f"{d}ي")
-    if h: parts.append(f"{h}س")
-    if m: parts.append(f"{m}د")
-    if s: parts.append(f"{s}ث")
-    return ' '.join(parts) if parts else "0s"
