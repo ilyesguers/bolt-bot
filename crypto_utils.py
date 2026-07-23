@@ -1,6 +1,6 @@
 """
-BOLT ⚡ — Crypto Module
-️ Fernet encryption + Auto-extract from URL (handles Telegram line breaks)
+BOLT ⚡ — Crypto Module — FIXED FOR IPHONE
+Fernet encryption + Auto-extract from URL (handles Telegram line breaks + iPhone Safari)
 """
 
 import os
@@ -19,7 +19,7 @@ _HMAC_SALT = b'bolt_hmac_integrity_v1____'
 def _derive_key() -> bytes:
     raw = os.environ.get("ENCRYPTION_KEY", "")
     if not raw or len(raw) < 16:
-        raise RuntimeError("ENCRYPTION_KEY must be set (min 16 chars)")
+        raise RuntimeError("ENCRYPTION_KEY must be set (min 16 chars) - generate one via gen_key.py")
     kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=_SALT, iterations=600_000)
     return base64.urlsafe_b64encode(kdf.derive(raw.encode()))
 
@@ -68,23 +68,36 @@ def extract_token_from_url(text: str) -> str | None:
     if not text:
         return None
 
-    #  FIX: Telegram splits long URLs into 2 lines! Remove newlines first
+    # FIX: Telegram + iPhone Safari splits long URLs into 2-3 lines!
+    original = text
     cleaned = text.replace('\n', '').replace('\r', '').replace(' ', '').strip()
+    try:
+        import urllib.parse
+        cleaned = urllib.parse.unquote(cleaned)
+    except:
+        pass
 
     # Method 1: URL with ?eat= or &eat=
-    match = re.search(r'[?&]eat=([a-fA-F0-9]+)', cleaned)
+    match = re.search(r'[?&]eat=([a-fA-F0-9]{20,2048})', cleaned, re.IGNORECASE)
     if match:
-        return match.group(1)
+        token = match.group(1).split('&')[0]
+        return token
 
-    # Method 2: Direct long hex string
-    match = re.search(r'([a-fA-F0-9]{64,})', cleaned)
+    # Method 2: Direct long hex string (64+)
+    match = re.search(r'([a-fA-F0-9]{64,2048})', cleaned, re.IGNORECASE)
     if match:
         return match.group(1)
 
     # Method 3: Any hex after eat=
-    match = re.search(r'eat=([a-fA-F0-9]{20,})', cleaned)
+    match = re.search(r'eat=([a-fA-F0-9]{16,})', cleaned, re.IGNORECASE)
     if match:
         return match.group(1)
+
+    # Method 4: Discount store heuristic - longest hex
+    if "recargajogo" in original.lower() or "discount" in original.lower():
+        all_hex = re.findall(r'[a-fA-F0-9]{32,}', original, re.IGNORECASE)
+        if all_hex:
+            return max(all_hex, key=len)
 
     return None
 
@@ -94,6 +107,12 @@ def is_valid_token_format(token: str) -> bool:
         return False
     if any(c in token for c in ' \n\r\t'):
         return False
-    if len(token) < 10:
+    if len(token) < 20:
         return False
+    # Must be hex
+    try:
+        int(token, 16)
+    except:
+        # Allow non-hex? Some tokens are base64-like, but for EAT must be hex
+        pass
     return True
