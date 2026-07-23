@@ -13,6 +13,7 @@ import database as D
 from i18n import t, LANGS
 from security import RateLimiter
 from crypto_utils import is_valid_token_format, extract_token_from_url, extract_full_data
+import rewards as R
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 OWNER_ID = int(os.environ.get("OWNER_ID", "0"))
@@ -43,6 +44,101 @@ def _one(l,c): return _btns([[_btn(l,c)]])
 def lang_kb(): return _btns([[_btn("🇸🇦 العربية","lang_ar"),_btn("🇬 English","lang_en")],[_btn("🇻🇳 Tiếng Việt","lang_vi"),_btn("🇮🇳 हिन्दी","lang_hi")]])
 def platform_kb(): return _btns([[_btn("🤖 Android","platform_android")],[_btn("🍎 iPhone","platform_ios")],[_btn("⏭️ تخطي","skip_tutorial")]])
 def tutorial_kb(a): return _btns([[_btn("🔄 إعادة الشرح","retry_android")],[_btn("✅ فهمت","got_it_android")]]) if a else _btns([[_btn("🔄 إعادة الشرح","retry_ios")],[_btn("✅ فهمت","got_it_ios")]])
+def build_card_text(uid):
+    """Beautiful account card with progress bars and real info"""
+    token = D.get_token(uid)
+    if not token:
+        return "❌ لا يوجد توكن محفوظ. أضف حسابك أولاً.", False
+
+    # Get saved settings
+    try:
+        acc = D.get_setting(f"account_id_{uid}") or ""
+        nick = D.get_setting(f"nickname_{uid}") or ""
+        reg = D.get_setting(f"region_{uid}") or "ME"
+    except:
+        acc = nick = reg = ""
+
+    # Try to get live player info (fallback to saved)
+    info = G.get_player_info(token, forced_open_id=acc, nickname_fallback=nick, region_fallback=reg)
+    name = info.get('name') or nick or "غير معروف"
+    uid_val = info.get('uid') or acc or "غير معروف"
+    level = info.get('level')
+    rank = info.get('rank')
+    region = info.get('region') or reg or "ME"
+    open_id = info.get('open_id') or "غير معروف"
+    status_text = info.get('status')
+    note = info.get('note') or ""
+    error_msg = info.get('error')
+
+    # Rewards info for progress bar
+    rewards_data = D.get_rewards(uid)
+    points = rewards_data.get('points', 0)
+    level_num = rewards_data.get('level', 1)
+    streak = rewards_data.get('streak', 0)
+    total_earned = rewards_data.get('total_earned', 0)
+    next_level = R.get_next_level(level_num)
+    prog = R.progress_to_next(points, level_num) if next_level else 100
+    filled = prog // 10
+    bar = "█" * filled + "░" * (10 - filled)
+
+    # Token validation status
+    try:
+        valid = G.validate_token(token)
+        token_valid = valid.get('valid')
+    except:
+        token_valid = None
+
+    # Decoration
+    header = "╔══════════════════════════════════════╗"
+    footer = "╚══════════════════════════════════════╝"
+    divider = "╠══════════════════════════════════════╣"
+    line_div = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    # Determine status emoji
+    if error_msg and not status_text:
+        status_emoji = "⚠️"
+    elif status_text == 'success':
+        status_emoji = "✅"
+    elif token_valid == True:
+        status_emoji = "✅"
+    elif token_valid == False:
+        status_emoji = "❌"
+    else:
+        status_emoji = "⚡"
+
+    # Build sections
+    lines = []
+    lines.append(header)
+    lines.append(f"║        👑 <b>بطاقة اللاعب</b> 👑        ║")
+    lines.append(divider)
+    lines.append(f"║  👤 الاسم: <b>{he(str(name))}</b>")
+    lines.append(f"║  🆔 الأيدي: <code>{he(str(uid_val))}</code>")
+    lines.append(f"║  🌍 السيرفر: <b>{he(str(region))}</b>")
+    lines.append(f"║  📊 المستوى: <b>{level or 'غير متاح'}</b>")
+    if rank:
+        lines.append(f"║  🏅 الرتبة: <b>{he(str(rank))}</b>")
+    lines.append(divider)
+    lines.append(f"║  🔥 السلسلة اليومية: <b>{streak} يوم</b>")
+    lines.append(f"║  ⭐ النقاط: <b>{points}</b> (+{total_earned})")
+    lines.append(f"║  📈 المستوى: <b>{R.get_level_info(level_num).get('name_ar', 'برونزي')}</b>")
+    lines.append(f"║  📊 التقدم: [{bar}] <b>{prog}%</b>")
+    if next_level:
+        lines.append(f"║  🎯 التالي: <b>{next_level.get('name_ar', '')}</b> ({next_level.get('min', '')} نقطة)")
+    else:
+        lines.append(f"║  🌟 <b>أعلى مستوى!</b> أنت أسطوري!")
+    lines.append(divider)
+    lines.append(f"║  ⚡ JWT / التوكن: {status_emoji} صالح")
+    lines.append(f"║  🔗 Open ID: <code>{str(open_id)[:20]}</code>")
+    if info.get('platform_used'):
+        lines.append(f"║  📱 المنصة: <b>{info.get('platform_used')}</b>")
+    if note:
+        lines.append(f"║  ℹ️ {he(str(note)[:40])}")
+    lines.append(footer)
+    lines.append(f"\n📋 <b>سجل العمليات:</b> {D.get_user(uid).get('total_ops', 0)} عملية")
+
+    text = "\n".join(lines)
+    return text, True
+
 def home_kb(uid):
     has=D.has_token(uid)
     rows=[]
@@ -146,6 +242,10 @@ async def home_cb(update,ctx):
             return ASK_TOKEN
         await q.edit_message_text(t(uid,"tools_title"), parse_mode=HTML, reply_markup=tools_kb(uid))
         return TOOLS_STATE
+    if cb=="card":
+        text, ok = build_card_text(uid)
+        await q.edit_message_text(text, parse_mode=HTML, reply_markup=_one(t(uid,"btn_back"),"home"))
+        return HOME_STATE
     if cb=="lang":
         await q.edit_message_text("🌍 اختر اللغة", parse_mode=HTML, reply_markup=lang_kb())
         return LANG_STATE
