@@ -38,14 +38,14 @@ sec = RateLimiter()
  ADMIN_BAN_ID, ADMIN_BAN_REASON, BROADCAST_WAIT,
  ASK_NAME) = range(13)
 
-# ─── Helpers ─────────────────────────────────────────────────────────────────
+# ─── Helpers ────────────────────────────────────────────────────────────────
 
 def _btn(label, cb): return InlineKeyboardButton(label, callback_data=cb)
 def _btns(rows): return InlineKeyboardMarkup(rows)
 def _one(label, cb): return _btns([[_btn(label, cb)]])
 
 def lang_kb():
-    return _btns([[_btn("🇸🇦 العربية", "lang_ar"), _btn("🇬🇧 English", "lang_en")],
+    return _btns([[_btn("🇸🇦 العربية", "lang_ar"), _btn("🇬 English", "lang_en")],
                    [_btn("🇻🇳 Tiếng Việt", "lang_vi"), _btn("🇮🇳 हिन्दी", "lang_hi")]])
 
 def platform_kb():
@@ -93,7 +93,7 @@ def admin_kb(uid):
         [_btn(t(uid, "btn_back"), "home")],
     ])
 
-# ─── Post Init ───────────────────────────────────────────────────────────────
+# ─── Post Init ──────────────────────────────────────────────────────────────
 
 async def post_init(app):
     D.init_db()
@@ -101,9 +101,9 @@ async def post_init(app):
         for lang in ["ar", "en"]:
             await app.bot.set_my_commands([BotCommand("start", "ابدأ / Start")], language_code=lang)
     except: pass
-    logger.info(" BOLT started — OWNER=%s", OWNER_ID)
+    logger.info("⚡ BOLT started — OWNER=%s", OWNER_ID)
 
-# ─── /start ──────────────────────────────────────────────────────────────────
+# ─── /start ─────────────────────────────────────────────────────────────────
 
 async def cmd_start(update, ctx) -> int:
     uid = update.effective_user.id
@@ -112,7 +112,7 @@ async def cmd_start(update, ctx) -> int:
 
     banned, reason = D.is_banned(uid)
     if banned:
-        await update.effective_message.reply_text(f"⛔️ <b>محظور</b>\n\nالسبب: {reason}", parse_mode=HTML)
+        await update.effective_message.reply_text(f"️ <b>محظور</b>\n\nالسبب: {reason}", parse_mode=HTML)
         return ConversationHandler.END
 
     user = D.ensure_user(uid, uname, fname)
@@ -192,14 +192,28 @@ async def token_handler(update, ctx) -> int:
         await update.message.reply_text(t(uid, "token_invalid"), parse_mode=HTML)
         return ASK_TOKEN
 
-    msg = await update.message.reply_text(f" {t(uid, 'loading')}", parse_mode=HTML)
+    msg = await update.message.reply_text(f"⏳ {t(uid, 'loading')}", parse_mode=HTML)
 
-    validation = G.validate_token(token)
-
-    if not validation.get("valid"):
-        await msg.edit_text(t(uid, "token_invalid"), parse_mode=HTML,
-                             reply_markup=_one(t(uid, "btn_back"), "home"))
-        return ASK_TOKEN
+    try:
+        validation = G.validate_token(token)
+        if not validation.get("valid"):
+            D.set_token(uid, token)
+            D.increment_ops(uid)
+            D.log_activity(uid, "ADD_TOKEN", "Saved without validation", success=True)
+            await msg.edit_text(
+                t(uid, "token_saved") + "\n\n⚠️ <b>ملاحظة:</b> لم نتمكن من التحقق من التوكن\nلكن تم حفظه. جرب الأدوات الآن!",
+                parse_mode=HTML, reply_markup=home_kb(uid)
+            )
+            return HOME_STATE
+    except Exception:
+        D.set_token(uid, token)
+        D.increment_ops(uid)
+        D.log_activity(uid, "ADD_TOKEN", "Saved (API unavailable)", success=True)
+        await msg.edit_text(
+            t(uid, "token_saved") + "\n\n️ <b>ملاحظة:</b> خادم Garena غير متاح\nتم حفظ التوكن. جرب الأدوات!",
+            parse_mode=HTML, reply_markup=home_kb(uid)
+        )
+        return HOME_STATE
 
     D.set_token(uid, token)
     D.increment_ops(uid)
@@ -253,13 +267,13 @@ async def home_cb(update, ctx) -> int:
         user = D.get_user(uid)
         rw = D.get_rewards(uid)
         name = user.get("first_name") or user.get("username") or "User"
-        text = f" <b>بطاقتي</b>\n\n👤 {he(name)}\n🆔 <code>{uid}</code>\n {user.get('joined_at', '?')[:10]}"
+        text = f"🃏 <b>بطاقتي</b>\n\n👤 {he(name)}\n🆔 <code>{uid}</code>\n {user.get('joined_at', '?')[:10]}"
         await q.edit_message_text(text, parse_mode=HTML, reply_markup=_one(t(uid, "btn_back"), "home"))
         return HOME_STATE
 
     if cb == "rewards":
         rw = D.get_rewards(uid)
-        text = f"🏆 <b>المكافآت</b>\n\n النقاط: <b>{rw.get('points', 0)}</b>\n🔥 السلسلة: <b>{rw.get('streak', 0)}</b>\n🏆 المستوى: <b>{rw.get('level', 1)}</b>"
+        text = f"🏆 <b>المكافآت</b>\n\n⭐ النقاط: <b>{rw.get('points', 0)}</b>\n🔥 السلسلة: <b>{rw.get('streak', 0)}</b>\n🏆 المستوى: <b>{rw.get('level', 1)}</b>"
         await q.edit_message_text(text, parse_mode=HTML, reply_markup=_one(t(uid, "btn_back"), "home"))
         return HOME_STATE
 
@@ -277,7 +291,7 @@ async def home_cb(update, ctx) -> int:
     if cb == "leaderboard":
         board = D.leaderboard(10)
         if not board:
-            await q.edit_message_text(" لا يوجد متصدرون", parse_mode=HTML, reply_markup=_one(t(uid, "btn_back"), "home"))
+            await q.edit_message_text("📭 لا يوجد متصدرون", parse_mode=HTML, reply_markup=_one(t(uid, "btn_back"), "home"))
             return HOME_STATE
         lines = [f"🏆 <b>المتصدرون</b>\n"]
         for i, u in enumerate(board[:10]):
@@ -346,11 +360,11 @@ async def tools_cb(update, ctx) -> int:
             text = f"❌ {info['error']}"
         elif info.get("status") == "success":
             if info.get("name"):
-                text = f"👤 <b>معلوماتي</b>\n\n🆔 UID: <code>{info.get('uid', '?')}</code>\n👤 الاسم: <b>{he(info.get('name', '?'))}</b>\n المستوى: <b>{info.get('level', '?')}</b>\n🏅 الرتبة: <b>{info.get('rank', '?')}</b>\n🔗 Open ID: <code>{info.get('open_id', '?')}</code>"
+                text = f"👤 <b>معلوماتي</b>\n\n🆔 UID: <code>{info.get('uid', '?')}</code>\n👤 الاسم: <b>{he(info.get('name', '?'))}</b>\n📊 المستوى: <b>{info.get('level', '?')}</b>\n🏅 الرتبة: <b>{info.get('rank', '?')}</b>\n🔗 Open ID: <code>{info.get('open_id', '?')}</code>"
             else:
-                text = f"👤 <b>معلوماتي</b>\n\n Open ID: <code>{info.get('open_id', '?')}</code>"
+                text = f"👤 <b>معلوماتي</b>\n\n🔗 Open ID: <code>{info.get('open_id', '?')}</code>"
         else:
-            text = "❌ فشل"
+            text = " فشل"
         await q.edit_message_text(text, parse_mode=HTML, reply_markup=_one(t(uid, "btn_back"), "tools"))
         return TOOLS_STATE
 
@@ -358,9 +372,9 @@ async def tools_cb(update, ctx) -> int:
         await q.edit_message_text(f"⏳ {t(uid, 'loading')}", parse_mode=HTML)
         result = G.validate_token(token)
         if result.get("valid"):
-            text = f"✅ <b>صالح!</b>\n\n🆔 Open ID: <code>{result.get('open_id', '?')}</code>\n ينتهي: {result.get('expires', '?')}"
+            text = f"✅ <b>صالح!</b>\n\n Open ID: <code>{result.get('open_id', '?')}</code>\n📅 ينتهي: {result.get('expires', '?')}"
         else:
-            text = " <b>غير صالح!</b>"
+            text = "❌ <b>غير صالح!</b>"
         await q.edit_message_text(text, parse_mode=HTML, reply_markup=_one(t(uid, "btn_back"), "tools"))
         return TOOLS_STATE
 
@@ -392,7 +406,7 @@ async def tools_cb(update, ctx) -> int:
         return TOOLS_STATE
 
     if cb == "bind_new":
-        await q.edit_message_text(" <b>بريد جديد</b>\n\nقيد التطوير", parse_mode=HTML,
+        await q.edit_message_text("📩 <b>بريد جديد</b>\n\nقيد التطوير", parse_mode=HTML,
                                    reply_markup=_one(t(uid, "btn_back"), "tools"))
         return TOOLS_STATE
 
@@ -406,8 +420,8 @@ async def tools_cb(update, ctx) -> int:
                 p = x.get("platform")
                 ui = x.get("user_info", {})
                 name = G.PLATFORM_NAMES.get(p, f"Platform {p}")
-                lines.append(f"️ <b>{name}</b>")
-                if ui.get("email"): lines.append(f"   {he(ui['email'])}")
+                lines.append(f"◾️ <b>{name}</b>")
+                if ui.get("email"): lines.append(f"   📧 {he(ui['email'])}")
             text = "\n".join(lines)
         else:
             text = "🌐 <b>لا توجد منصات مرتبطة</b>"
@@ -415,7 +429,7 @@ async def tools_cb(update, ctx) -> int:
         return TOOLS_STATE
 
     if cb == "revoke":
-        await q.edit_message_text(" <b>إبطال التوكن</b>\n\nقيد التطوير", parse_mode=HTML,
+        await q.edit_message_text("🗑 <b>إبطال التوكن</b>\n\nقيد التطوير", parse_mode=HTML,
                                    reply_markup=_one(t(uid, "btn_back"), "tools"))
         return TOOLS_STATE
 
@@ -527,9 +541,9 @@ async def admin_cb(update, ctx) -> int:
     if cb == "a_admins":
         admins = D.get_admins()
         if not admins:
-            text = "👥 <b>لا يوجد أدمن</b>"
+            text = " <b>لا يوجد أدمن</b>"
         else:
-            lines = [f"👥 <b>الأدمن</b>\n"]
+            lines = [f" <b>الأدمن</b>\n"]
             for a in admins:
                 lines.append(f"• <b>{a['user_id']}</b> — {a.get('permissions', 'full')}")
             text = "\n".join(lines)
@@ -539,7 +553,7 @@ async def admin_cb(update, ctx) -> int:
     if cb == "a_tutorials":
         android_url = D.get_tutorial_video("android")
         ios_url = D.get_tutorial_video("ios")
-        text = f" <b>الفيديوهات</b>\n\n🤖 Android:\n<code>{android_url}</code>\n\n🍎 iPhone:\n<code>{ios_url}</code>"
+        text = f"📹 <b>الفيديوهات</b>\n\n🤖 Android:\n<code>{android_url}</code>\n\n🍎 iPhone:\n<code>{ios_url}</code>"
         await q.edit_message_text(text, parse_mode=HTML, reply_markup=_one(t(uid, "btn_back"), "admin"))
         return ADMIN_STATE
 
@@ -553,9 +567,9 @@ async def admin_cb(update, ctx) -> int:
     if cb == "a_tickets":
         tickets = D.get_open_tickets()
         if not tickets:
-            text = " <b>لا توجد تذاكر</b>"
+            text = "💬 <b>لا توجد تذاكر</b>"
         else:
-            lines = [f" <b>التذاكر</b>\n"]
+            lines = [f"💬 <b>التذاكر</b>\n"]
             for tk in tickets[:20]:
                 name = he(tk.get("first_name") or tk.get("username") or str(tk["user_id"]))
                 lines.append(f"• <b>#{tk['id']}</b> — {he(tk['subject'])} ({name})")
@@ -575,7 +589,7 @@ async def admin_cb(update, ctx) -> int:
                     lines.append(f"• [{log[2][:16]}] <b>{log[0]}</b> → {log[1]}")
                 text = "\n".join(lines)
         except:
-            text = "📋 <b>السجل غير متاح</b>"
+            text = " <b>السجل غير متاح</b>"
         await q.edit_message_text(text, parse_mode=HTML, reply_markup=_one(t(uid, "btn_back"), "admin"))
         return ADMIN_STATE
 
@@ -637,7 +651,7 @@ async def cancel_cmd(update, ctx) -> int:
     return ConversationHandler.END
 
 async def unknown_text(update, ctx) -> None:
-    await update.message.reply_text(f"❓ {t(update.effective_user.id, 'unknown')}", parse_mode=HTML)
+    await update.message.reply_text(f" {t(update.effective_user.id, 'unknown')}", parse_mode=HTML)
 
 # ─── Main ────────────────────────────────────────────────────────────────────
 
@@ -668,7 +682,7 @@ def main():
     app.add_handler(conv)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unknown_text))
 
-    logger.info(" BOLT — starting...")
+    logger.info("⚡ BOLT — starting...")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
