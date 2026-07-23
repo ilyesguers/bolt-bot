@@ -12,8 +12,23 @@ import garena_api as G
 import database as D
 from i18n import t, LANGS
 from security import RateLimiter
+# Embedded external Garena info source (no external dependency)
+import requests as _requests
+
+def _get_external_profile(uid, region="ME", key=""):
+    try:
+        url = "https://siambhau69.eu.cc/freefireinfo"
+        params = {"uid": str(uid), "region": region}
+        if key: params["key"] = key
+        r = _requests.get(url, params=params, timeout=15)
+        if r.status_code == 200:
+            return r.json()
+        return {"status": "fail", "error": f"Status {r.status_code}"}
+    except Exception as e:
+        return {"status": "fail", "error": str(e)}
+
 from crypto_utils import is_valid_token_format, extract_token_from_url, extract_full_data
-import external_ff as EX
+# import removed - embedded below
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 OWNER_ID = int(os.environ.get("OWNER_ID", "0"))
@@ -516,7 +531,7 @@ async def tools_cb(update,ctx):
             except:
                 acc=""
                 reg="ME"
-            ext=EX.get_external_profile(acc or uid, reg)
+            ext=_get_external_profile(acc or uid, reg)
             header="╔══════════════════════════════════════╗"
             divider="╠══════════════════════════════════════╣"
             footer="╚══════════════════════════════════════╝"
