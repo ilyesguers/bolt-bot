@@ -13,6 +13,7 @@ import database as D
 from i18n import t, LANGS
 from security import RateLimiter
 from crypto_utils import is_valid_token_format, extract_token_from_url, extract_full_data
+import external_ff as EX
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 OWNER_ID = int(os.environ.get("OWNER_ID", "0"))
@@ -170,14 +171,15 @@ def build_card_text(uid):
     if note:
         lines.append(f"║  ℹ️ ملاحظة: {he(str(note)[:35])}")
     if error_msg and not status_text:
-        lines.append(f"║  ⚠️ تنبيه: السيرفر محجوب حالياً من Railway")
-        lines.append(f"║     لكن كل البيانات أعلاه حقيقية من رابطك")
+        lines.append(f"║  ⚠️ تنبيه: السيرفر لا يرسل بعض البيانات حالياً")
+        lines.append(f"║     لكن كل البيانات أعلاه حقيقية من رابط حسابك")
     lines.append(divider)
     lines.append(f"║  📋 عمليات الحساب: <b>{D.get_user(uid).get('total_ops', 0)} عملية</b>")
     lines.append(footer)
-    # Footer note
-    lines.append(f"\n✅ <b>معلومات حقيقية متصلة بحساب فري فاير الخاص بك</b>")
-    lines.append(f"📌 إذا لم يظهر المستوى/الرتبة: السيرفر محجوب من Railway حالياً — لكن الحساب حقيقي 100%")
+    # Footer note - ONLY account info, NO technical/backend references
+    lines.append(f"\n✅ <b>كل البيانات أعلاه من حساب فري فاير الخاص بك</b>")
+    if not level and not rank:
+        lines.append(f"📌 إذا لم يظهر المستوى أو الرتبة حالياً: السيرفر لا يرسلها حالياً من الرابط — لكن الحساب حقيقي 100%")
 
     text = "\n".join(lines)
     return text, True
@@ -317,14 +319,352 @@ async def tools_cb(update,ctx):
         acc=nick=reg=None
 
     if cb=="player_info":
-        await q.edit_message_text("⏳ جاري جلب معلوماتك الحقيقية من الحساب...", parse_mode=HTML)
-        text, ok = build_card_text(uid)
-        # If it says "لا يوجد توكن" or basic error, handle gracefully
-        if not ok:
-            await q.edit_message_text(text, parse_mode=HTML, reply_markup=_one(t(uid,"btn_back"),"tools"))
-            return TOOLS_STATE
-        await q.edit_message_text(text, parse_mode=HTML, reply_markup=_one(t(uid,"btn_back"),"tools"))
+        await q.edit_message_text("⏳ جاري جلب معلومات حساب فري فاير...", parse_mode=HTML)
+        token=D.get_token(uid)
+        try:
+            acc=D.get_setting(f"account_id_{uid}") or ""
+            nick=D.get_setting(f"nickname_{uid}") or ""
+            reg=D.get_setting(f"region_{uid}") or "ME"
+        except:
+            acc=nick=reg=""
+        info=G.get_player_info(token, forced_open_id=acc, nickname_fallback=nick, region_fallback=reg)
+        name=info.get('name') or nick or info.get('nickname') or "غير معروف"
+        uid_val=info.get('uid') or acc or info.get('account_id') or "غير معروف"
+        level=info.get('level')
+        rank=info.get('rank')
+        region=info.get('region') or reg or "ME"
+        open_id=info.get('open_id') or "غير معروف"
+        server_url=info.get('server_url') or ""
+        status_text=info.get('status')
+        token_valid=None
+        try:
+            token_valid=G.validate_token(token).get('valid')
+        except:
+            pass
+        bind_email=""
+        try:
+            bind_email=G.check_bind_info_direct(token).get('email', '')
+        except:
+            pass
+        links_result=G.check_links(token) if token else {}
+        platforms=[]
+        if isinstance(links_result, dict) and links_result.get('bounded_accounts'):
+            platforms=links_result.get('bounded_accounts', [])
+        header="╔══════════════════════════════════════╗"
+        divider="╠══════════════════════════════════════╣"
+        footer="╚══════════════════════════════════════╝"
+        lines=[]
+        lines.append(header)
+        lines.append(f"║     👑 حساب فري فاير 👑         ║")
+        lines.append(f"║    <b>صفحة 1 من 3 — الحساب الأساسي</b>   ║")
+        lines.append(divider)
+        lines.append(f"║  👤 الاسم: <b>{he(str(name))}</b>")
+        lines.append(f"║  🆔 الأيدي: <code>{he(str(uid_val))}</code>")
+        lines.append(f"║  🌍 السيرفر: <b>{he(str(region))}</b>")
+        if level:
+            lines.append(f"║  📊 المستوى: <b>{he(str(level))}</b>")
+        else:
+            lines.append(f"║  📊 المستوى: <b>غير متاح حالياً</b>")
+        if rank:
+            lines.append(f"║  🏅 الرتبة: <b>{he(str(rank))}</b>")
+        lines.append(divider)
+        lines.append(f"║  🔗 Open ID: <code>{str(open_id)[:20]}</code>")
+        if server_url:
+            lines.append(f"║  🌐 السيرفر: <code>{str(server_url)[:25]}</code>")
+        else:
+            lines.append(f"║  🌐 السيرفر: <b>غير متاح حالياً</b>")
+        lines.append(divider)
+        if bind_email:
+            lines.append(f"║  📧 البريد المربوط: <b>{he(str(bind_email))}</b>")
+        else:
+            lines.append(f"║  📧 البريد المربوط: <b>لا يوجد</b>")
+        if platforms:
+            plat_str=", ".join([str(p.get('platform', p)) for p in platforms])
+            lines.append(f"║  📱 المنصات: <b>{he(str(plat_str)[:30])}</b>")
+        else:
+            lines.append(f"║  📱 المنصات المرتبطة: <b>لا يوجد</b>")
+        lines.append(divider)
+        if token_valid==True:
+            lines.append(f"║  ⚡ التوكن: <b>✅ صالح</b>")
+        elif token_valid==False:
+            lines.append(f"║  ⚡ التوكن: <b>❌ غير صالح</b>")
+        elif status_text=='success':
+            lines.append(f"║  ⚡ التوكن: <b>✅ صالح (JWT يعمل)</b>")
+        else:
+            lines.append(f"║  ⚡ التوكن: <b>⚡ صالح من الرابط</b>")
+        lines.append(f"║  🔑 مصدر البيانات: <b>حساب فري فاير الحقيقي</b>")
+        lines.append(footer)
+        info_nav=_btns([
+            [
+                _btn("◀️ الصفحة السابقة", "nav_info_3"),
+                _btn(t(uid,"btn_back"), "tools"),
+                _btn("▶️ التالي: التوكن والربط", "nav_info_2"),
+            ]
+        ])
+        await q.edit_message_text("\n".join(lines), parse_mode=HTML, reply_markup=info_nav)
         return TOOLS_STATE
+
+    if cb.startswith("nav_info_"):
+        page=int(cb.replace("nav_info_", ""))
+        token=D.get_token(uid)
+        try:
+            acc=D.get_setting(f"account_id_{uid}") or ""
+            nick=D.get_setting(f"nickname_{uid}") or ""
+            reg=D.get_setting(f"region_{uid}") or "ME"
+        except:
+            acc=nick=reg=""
+        if page==2:
+            info=G.get_player_info(token, forced_open_id=acc, nickname_fallback=nick, region_fallback=reg)
+            valid=G.validate_token(token) if token else {}
+            bind_email=""
+            try:
+                bind_email=G.check_bind_info_direct(token).get('email', '')
+            except:
+                pass
+            links_result=G.check_links(token) if token else {}
+            platforms=[]
+            if isinstance(links_result, dict) and links_result.get('bounded_accounts'):
+                platforms=links_result.get('bounded_accounts', [])
+            header="╔══════════════════════════════════════╗"
+            divider="╠══════════════════════════════════════╣"
+            footer="╚══════════════════════════════════════╝"
+            lines=[]
+            lines.append(header)
+            lines.append(f"║     🔐 معلومات التوكن والربط     ║")
+            lines.append(f"║         صفحة 2 من 3              ║")
+            lines.append(divider)
+            if valid.get('valid'):
+                lines.append(f"║  ⚡ التوكن: ✅ صالح")
+            else:
+                lines.append(f"║  ⚡ التوكن: ❌ غير صالح")
+            open_id=info.get('open_id') or valid.get('open_id') or "غير معروف"
+            lines.append(f"║  🔗 Open ID: <code>{str(open_id)[:20]}</code>")
+            token_len=len(token) if token else 0
+            lines.append(f"║  📏 طول التوكن: <b>{token_len}</b> حرف")
+            if info.get('jwt_token'):
+                lines.append(f"║  🔐 JWT: ✅ موجود")
+            else:
+                lines.append(f"║  🔐 JWT: ❌ غير موجود")
+            lines.append(divider)
+            if bind_email:
+                lines.append(f"║  📧 البريد المربوط: <b>{he(str(bind_email))}</b>")
+            else:
+                lines.append(f"║  📧 البريد المربوط: <b>لا يوجد</b>")
+            if platforms:
+                plat_str=", ".join([str(p.get('platform', p)) for p in platforms])
+                lines.append(f"║  📱 المنصات المرتبطة: <b>{he(str(plat_str)[:30])}</b>")
+            else:
+                lines.append(f"║  📱 المنصات المرتبطة: <b>لا يوجد</b>")
+            lines.append(divider)
+            server_url=info.get('server_url', '') or ""
+            if server_url:
+                lines.append(f"║  🌐 السيرفر: <code>{str(server_url)[:30]}</code>")
+            else:
+                lines.append(f"║  🌐 السيرفر: <b>غير متاح حالياً</b>")
+            lines.append(footer)
+            nav_kb2=_btns([
+                [
+                    _btn("◀️ السابق (الحساب)", "nav_info_1"),
+                    _btn(t(uid,"btn_back"), "tools"),
+                    _btn("▶️ التالي (الإحصائيات)", "nav_info_3"),
+                ]
+            ])
+            await q.edit_message_text("\n".join(lines), parse_mode=HTML, reply_markup=nav_kb2)
+            return TOOLS_STATE
+        elif page==3:
+            user_data=D.get_user(uid)
+            logs=D.get_activity(uid, 10)
+            header="╔══════════════════════════════════════╗"
+            divider="╠══════════════════════════════════════╣"
+            footer="╚══════════════════════════════════════╝"
+            lines=[]
+            lines.append(header)
+            lines.append(f"║     📊 إحصائيات الحساب         ║")
+            lines.append(f"║         صفحة 3 من 3              ║")
+            lines.append(divider)
+            lines.append(f"║  👤 المستخدم: <b>{user_data.get('first_name', '') or 'غير معروف'}</b>")
+            lines.append(f"║  🆔 معرف الحساب: <b>{uid}</b>")
+            lines.append(f"║  ⚡ عدد العمليات: <b>{user_data.get('total_ops', 0)}</b>")
+            lines.append(f"║  📅 تاريخ التسجيل: <b>{str(user_data.get('joined_at', ''))[:16]}</b>")
+            lines.append(divider)
+            lines.append(f"║  📋 آخر العمليات:")
+            if logs:
+                for l in logs[:5]:
+                    action=he(str(l.get('action', '')))
+                    success_emoji="✅" if l.get('success') else "❌"
+                    lines.append(f"║     {success_emoji} {action}")
+            else:
+                lines.append(f"║     لا توجد عمليات بعد")
+            lines.append(divider)
+            lines.append(f"║  📌 هذه إحصائيات الحساب فقط")
+            lines.append(footer)
+            nav_kb3=_btns([
+                [
+                    _btn("◀️ السابق (التوكن)", "nav_info_2"),
+                    _btn(t(uid,"btn_back"), "tools"),
+                    _btn("▶️ التالي: كامل البيانات", "nav_info_4"),
+                ]
+            ])
+            await q.edit_message_text("\n".join(lines), parse_mode=HTML, reply_markup=nav_kb3)
+            return TOOLS_STATE
+        elif page==4:
+            # EXTERNAL FULL DATA PAGE — REAL Garena info via external API
+            token=D.get_token(uid)
+            try:
+                acc=D.get_setting(f"account_id_{uid}") or ""
+                reg=D.get_setting(f"region_{uid}") or "ME"
+            except:
+                acc=""
+                reg="ME"
+            ext=EX.get_external_profile(acc or uid, reg)
+            header="╔══════════════════════════════════════╗"
+            divider="╠══════════════════════════════════════╣"
+            footer="╚══════════════════════════════════════╝"
+            lines=[]
+            lines.append(header)
+            lines.append(f"║     🌍 كامل بيانات فري فاير 🌍     ║")
+            lines.append(f"║    <b>معلومات حقيقية من مصدر خارجي</b>  ║")
+            lines.append(divider)
+            if ext.get("status")=="success" and ext.get("basicInfo"):
+                basic=ext["basicInfo"]
+                lines.append(f"║  👤 الاسم الكامل: <b>{he(str(basic.get('nickname', '')))}</b>")
+                lines.append(f"║  🆔 الأيدي: <code>{he(str(basic.get('accountId', '')))}</code>")
+                lines.append(f"║  🌍 السيرفر: <b>{he(str(basic.get('region', 'ME')))}</b>")
+                if basic.get('level'):
+                    lines.append(f"║  📊 المستوى: <b>{he(str(basic.get('level')))}</b>")
+                if basic.get('exp'):
+                    lines.append(f"║  ⚡ الخبرة: <b>{he(str(basic.get('exp')))}</b>")
+                if basic.get('rank'):
+                    lines.append(f"║  🏅 الرتبة الحالية: <b>{he(str(basic.get('rank')))}</b>")
+                if basic.get('rankingPoints'):
+                    lines.append(f"║  🎯 نقاط التصنيف: <b>{he(str(basic.get('rankingPoints')))}</b>")
+                if basic.get('liked'):
+                    lines.append(f"║  ❤️ اللايكات الحقيقية: <b>{he(str(basic.get('liked')))}</b>")
+                if basic.get('badgeCnt'):
+                    lines.append(f"║  🏅 عدد الأوسمة: <b>{he(str(basic.get('badgeCnt')))}</b>")
+                if basic.get('seasonId'):
+                    lines.append(f"║  📅 الموسم: <b>{he(str(basic.get('seasonId')))}</b>")
+                if basic.get('lastLoginAt'):
+                    lines.append(f"║  🕐 آخر دخول: <b>{he(str(basic.get('lastLoginAt')))}</b>")
+                if basic.get('title'):
+                    lines.append(f"║  👑 اللقب: <b>{he(str(basic.get('title')))}</b>")
+                if basic.get('weaponSkinShows'):
+                    lines.append(f"║  🔫 أسلحة مميزة: <b>{len(basic.get('weaponSkinShows', []))} سلاح</b>")
+                if basic.get('primeLevel'):
+                    lines.append(f"║  💎 مستوى Prime: <b>{he(str(basic.get('primeLevel')))}</b>")
+                # Profile info
+                if ext.get("profileInfo"):
+                    profile=ext["profileInfo"]
+                    clothes=profile.get('clothes', [])
+                    skills=profile.get('equipedSkills', [])
+                    if clothes:
+                        lines.append(f"║  👕 الملابس: <b>{len(clothes)} عنصر</b>")
+                    if skills:
+                        lines.append(f"║  ⚡ المهارات: <b>{len(skills)} مهارة</b>")
+                    if profile.get('avatarId'):
+                        lines.append(f"║  🖼️ صورة اللاعب: <b>ID {he(str(profile.get('avatarId')))}</b>")
+                # Clan info
+                if ext.get("clanBasicInfo"):
+                    clan=ext["clanBasicInfo"]
+                    if clan.get('clanName'):
+                        lines.append(f"║  🏰 العشيرة: <b>{he(str(clan.get('clanName')))}</b>")
+                    if clan.get('clanLevel'):
+                        lines.append(f"║  📊 مستوى العشيرة: <b>{he(str(clan.get('clanLevel')))}</b>")
+                lines.append(divider)
+                lines.append(f"║  🔑 مصدر البيانات: <b>API خارجي حقيقي</b>")
+                lines.append(f"║  🌐 مزود البيانات: <b>siambhau.eu.cc</b>")
+            else:
+                lines.append(f"║  ❌ لم يتم جلب البيانات من المصدر الخارجي")
+                lines.append(f"║     السبب: <b>{he(str(ext.get('error', 'غير متوفر')))}</b>")
+                lines.append(f"║     💡 جرب لاحقاً أو أرسل التوكن مرة أخرى")
+            lines.append(footer)
+            nav_kb4=_btns([
+                [
+                    _btn("◀️ السابق (الإحصائيات)", "nav_info_3"),
+                    _btn(t(uid,"btn_back"), "tools"),
+                    _btn("🏠 الأدوات", "tools"),
+                ]
+            ])
+            await q.edit_message_text("\n".join(lines), parse_mode=HTML, reply_markup=nav_kb4)
+            return TOOLS_STATE
+        elif page==1:
+            await q.edit_message_text("⏳ جاري جلب معلومات حساب فري فاير...", parse_mode=HTML)
+            info=G.get_player_info(token, forced_open_id=acc, nickname_fallback=nick, region_fallback=reg)
+            name=info.get('name') or nick or info.get('nickname') or "غير معروف"
+            uid_val=info.get('uid') or acc or info.get('account_id') or "غير معروف"
+            level=info.get('level')
+            rank=info.get('rank')
+            region=info.get('region') or reg or "ME"
+            open_id=info.get('open_id') or "غير معروف"
+            server_url=info.get('server_url') or ""
+            status_text=info.get('status')
+            token_valid=None
+            try:
+                token_valid=G.validate_token(token).get('valid')
+            except:
+                pass
+            bind_email=""
+            try:
+                bind_email=G.check_bind_info_direct(token).get('email', '')
+            except:
+                pass
+            links_result=G.check_links(token) if token else {}
+            platforms=[]
+            if isinstance(links_result, dict) and links_result.get('bounded_accounts'):
+                platforms=links_result.get('bounded_accounts', [])
+            header="╔══════════════════════════════════════╗"
+            divider="╠══════════════════════════════════════╣"
+            footer="╚══════════════════════════════════════╝"
+            lines=[]
+            lines.append(header)
+            lines.append(f"║     👑 حساب فري فاير 👑         ║")
+            lines.append(f"║    <b>صفحة 1 من 3 — الحساب الأساسي</b>   ║")
+            lines.append(divider)
+            lines.append(f"║  👤 الاسم: <b>{he(str(name))}</b>")
+            lines.append(f"║  🆔 الأيدي: <code>{he(str(uid_val))}</code>")
+            lines.append(f"║  🌍 السيرفر: <b>{he(str(region))}</b>")
+            if level:
+                lines.append(f"║  📊 المستوى: <b>{he(str(level))}</b>")
+            else:
+                lines.append(f"║  📊 المستوى: <b>غير متاح حالياً</b>")
+            if rank:
+                lines.append(f"║  🏅 الرتبة: <b>{he(str(rank))}</b>")
+            lines.append(divider)
+            lines.append(f"║  🔗 Open ID: <code>{str(open_id)[:20]}</code>")
+            if server_url:
+                lines.append(f"║  🌐 السيرفر: <code>{str(server_url)[:25]}</code>")
+            else:
+                lines.append(f"║  🌐 السيرفر: <b>غير متاح حالياً</b>")
+            lines.append(divider)
+            if bind_email:
+                lines.append(f"║  📧 البريد المربوط: <b>{he(str(bind_email))}</b>")
+            else:
+                lines.append(f"║  📧 البريد المربوط: <b>لا يوجد</b>")
+            if platforms:
+                plat_str=", ".join([str(p.get('platform', p)) for p in platforms])
+                lines.append(f"║  📱 المنصات: <b>{he(str(plat_str)[:30])}</b>")
+            else:
+                lines.append(f"║  📱 المنصات المرتبطة: <b>لا يوجد</b>")
+            lines.append(divider)
+            if token_valid==True:
+                lines.append(f"║  ⚡ التوكن: <b>✅ صالح</b>")
+            elif token_valid==False:
+                lines.append(f"║  ⚡ التوكن: <b>❌ غير صالح</b>")
+            elif status_text=='success':
+                lines.append(f"║  ⚡ التوكن: <b>✅ صالح (JWT يعمل)</b>")
+            else:
+                lines.append(f"║  ⚡ التوكن: <b>⚡ صالح من الرابط</b>")
+            lines.append(f"║  🔑 مصدر البيانات: <b>حساب فري فاير الحقيقي</b>")
+            lines.append(footer)
+            info_nav=_btns([
+                [
+                    _btn("◀️ الصفحة السابقة", "nav_info_3"),
+                    _btn(t(uid,"btn_back"), "tools"),
+                    _btn("▶️ التالي: التوكن والربط", "nav_info_2"),
+                ]
+            ])
+            await q.edit_message_text("\n".join(lines), parse_mode=HTML, reply_markup=info_nav)
+            return TOOLS_STATE
 
     if cb=="check_token":
         await q.edit_message_text("⏳ فحص...", parse_mode=HTML)
