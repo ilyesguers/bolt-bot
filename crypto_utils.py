@@ -1,7 +1,6 @@
 """
 BOLT ⚡ — Crypto Module
-️ Fernet (AES-128-CBC + HMAC-SHA256) encryption
- Token fingerprints + Auto-extract from URL
+️ Fernet encryption + Auto-extract from URL (handles Telegram line breaks)
 """
 
 import os
@@ -66,26 +65,24 @@ def mask_token(token: str) -> str:
 
 
 def extract_token_from_url(text: str) -> str | None:
-    """
-    Extract access token from a discstore URL.
-    Accepts full URL and extracts the ?eat= parameter value.
-    Also accepts raw token directly.
-    """
-    text = text.strip()
     if not text:
         return None
 
-    # Direct token (long alphanumeric string without spaces or URL chars)
-    if len(text) >= 10 and '?' not in text and '/' not in text:
-        return text
+    #  FIX: Telegram splits long URLs into 2 lines! Remove newlines first
+    cleaned = text.replace('\n', '').replace('\r', '').replace(' ', '').strip()
 
-    # URL with ?eat= parameter
-    match = re.search(r'[?&]eat=([a-fA-F0-9]+)', text)
+    # Method 1: URL with ?eat= or &eat=
+    match = re.search(r'[?&]eat=([a-fA-F0-9]+)', cleaned)
     if match:
         return match.group(1)
 
-    # URL with eat= anywhere
-    match = re.search(r'eat=([a-fA-F0-9]{10,})', text)
+    # Method 2: Direct long hex string
+    match = re.search(r'([a-fA-F0-9]{64,})', cleaned)
+    if match:
+        return match.group(1)
+
+    # Method 3: Any hex after eat=
+    match = re.search(r'eat=([a-fA-F0-9]{20,})', cleaned)
     if match:
         return match.group(1)
 
@@ -93,7 +90,6 @@ def extract_token_from_url(text: str) -> str | None:
 
 
 def is_valid_token_format(token: str) -> bool:
-    """Accept any non-empty token without spaces."""
     if not token:
         return False
     if any(c in token for c in ' \n\r\t'):
