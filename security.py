@@ -1,11 +1,9 @@
 """
 BOLT ⚡ — Security Module
-━━━━━━━━━━━━━━━━━━━━━━━━━
-🛡️ Rate limiting (sliding window)
+ Rate limiting (sliding window)
 🚫 Ban system with expiry
-📋 Audit trail (SQLite-backed)
+ Audit trail (SQLite-backed)
 🧼 Input sanitization & email validation
-🔍 Token abuse detection
 """
 
 import time
@@ -18,24 +16,17 @@ from html import escape as _escape
 
 logger = logging.getLogger("bolt.security")
 
-# ─── Rate Limiter ─────────────────────────────────────────────────────────────
 
 class RateLimiter:
-    """
-    Sliding-window rate limiter backed by SQLite.
-    Separate buckets per (user, action) pair.
-    """
-
     LIMITS = {
-        # action: (max_requests, window_seconds)
-        "general":      (30, 60),
-        "token_ops":    (5,  120),    # token add / change
-        "garena_api":   (6,  120),    # external API calls
-        "nickname":     (3,  300),    # name changes
-        "bind_change":  (2,  300),
-        "broadcast":    (1,  600),
-        "code_gen":     (15, 60),
-        "reward_claim": (1,  86400),  # once per 24h
+        "general": (30, 60),
+        "token_ops": (5, 120),
+        "garena_api": (6, 120),
+        "nickname": (3, 300),
+        "bind_change": (2, 300),
+        "broadcast": (1, 600),
+        "code_gen": (15, 60),
+        "reward_claim": (1, 86400),
     }
 
     def __init__(self, db_path: str = "bolt_security.db"):
@@ -44,53 +35,44 @@ class RateLimiter:
         self._mem: dict[str, list[float]] = {}
         self._init_db()
 
-    # ── DB Init ────────────────────────────────────────────────────────
-
     def _init_db(self):
         conn = sqlite3.connect(self._db)
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS audit_log (
-                id        INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id   INTEGER NOT NULL,
-                username  TEXT DEFAULT '',
-                action    TEXT    NOT NULL,
-                detail    TEXT    DEFAULT '',
-                timestamp TEXT    NOT NULL
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                username TEXT DEFAULT '',
+                action TEXT NOT NULL,
+                detail TEXT DEFAULT '',
+                timestamp TEXT NOT NULL
             );
-            CREATE INDEX IF NOT EXISTS idx_audit_user_ts
-                ON audit_log(user_id, timestamp DESC);
+            CREATE INDEX IF NOT EXISTS idx_audit_user_ts ON audit_log(user_id, timestamp DESC);
 
             CREATE TABLE IF NOT EXISTS banned (
-                user_id    INTEGER PRIMARY KEY,
-                reason     TEXT DEFAULT '',
-                banned_at  TEXT NOT NULL,
+                user_id INTEGER PRIMARY KEY,
+                reason TEXT DEFAULT '',
+                banned_at TEXT NOT NULL,
                 expires_at TEXT
             );
 
             CREATE TABLE IF NOT EXISTS abuse_flags (
-                id        INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id   INTEGER NOT NULL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
                 flag_type TEXT NOT NULL,
-                detail    TEXT DEFAULT '',
+                detail TEXT DEFAULT '',
                 timestamp TEXT NOT NULL
             );
-            CREATE INDEX IF NOT EXISTS idx_abuse_user
-                ON abuse_flags(user_id);
         """)
         conn.commit()
         conn.close()
 
-    # ── Rate Checking ──────────────────────────────────────────────────
-
     def check(self, user_id: int, action: str = "general") -> tuple[bool, int]:
-        """Returns (allowed, retry_seconds)."""
         now = time.time()
         key = f"{user_id}:{action}"
         max_req, window = self.LIMITS.get(action, (10, 60))
 
         with self._lock:
             entries = self._mem.get(key, [])
-            # Prune old
             entries = [t for t in entries if now - t < window]
 
             if len(entries) >= max_req:
@@ -107,20 +89,16 @@ class RateLimiter:
     def remaining(self, user_id: int, action: str = "general") -> int:
         now = time.time()
         key = f"{user_id}:{action}"
-        _, window = self.LIMITS.get(action, (10, 60))
-        max_req, _ = self.LIMITS.get(action, (10, 60))
+        max_req, window = self.LIMITS.get(action, (10, 60))
         active = [t for t in self._mem.get(key, []) if now - t < window]
         return max(0, max_req - len(active))
-
-    # ── Audit Logging ──────────────────────────────────────────────────
 
     def audit(self, user_id: int, action: str, detail: str = "", username: str = ""):
         now = datetime.now(timezone.utc).isoformat()
         detail = detail[:500]
         conn = sqlite3.connect(self._db)
         conn.execute(
-            "INSERT INTO audit_log (user_id, username, action, detail, timestamp) "
-            "VALUES (?,?,?,?,?)",
+            "INSERT INTO audit_log (user_id, username, action, detail, timestamp) VALUES (?,?,?,?,?)",
             (user_id, username, action, detail, now)
         )
         conn.commit()
@@ -149,15 +127,12 @@ class RateLimiter:
         conn.commit()
         conn.close()
 
-    # ── Ban System ─────────────────────────────────────────────────────
-
     def ban(self, user_id: int, reason: str, hours: float = None):
         now = datetime.now(timezone.utc)
         expires = (now + timedelta(hours=hours)).isoformat() if hours else None
         conn = sqlite3.connect(self._db)
         conn.execute(
-            "INSERT OR REPLACE INTO banned (user_id, reason, banned_at, expires_at) "
-            "VALUES (?,?,?,?)",
+            "INSERT OR REPLACE INTO banned (user_id, reason, banned_at, expires_at) VALUES (?,?,?,?)",
             (user_id, reason, now.isoformat(), expires)
         )
         conn.commit()
@@ -193,14 +168,11 @@ class RateLimiter:
         conn.close()
         return [dict(r) for r in rows]
 
-    # ── Abuse Detection ────────────────────────────────────────────────
-
     def _flag_abuse(self, user_id: int, flag_type: str, detail: str):
         now = datetime.now(timezone.utc).isoformat()
         conn = sqlite3.connect(self._db)
         conn.execute(
-            "INSERT INTO abuse_flags (user_id, flag_type, detail, timestamp) "
-            "VALUES (?,?,?,?)",
+            "INSERT INTO abuse_flags (user_id, flag_type, detail, timestamp) VALUES (?,?,?,?)",
             (user_id, flag_type, detail[:200], now)
         )
         conn.commit()
@@ -215,8 +187,6 @@ class RateLimiter:
         ).fetchone()[0]
         conn.close()
         return n
-
-    # ── Stats ──────────────────────────────────────────────────────────
 
     def stats(self) -> dict:
         conn = sqlite3.connect(self._db)
@@ -235,8 +205,6 @@ class RateLimiter:
         return s
 
 
-# ─── Input Sanitization ───────────────────────────────────────────────────────
-
 def sanitize_html(text: str) -> str:
     return _escape(text, quote=True)
 
@@ -250,13 +218,11 @@ def validate_email(email: str) -> bool:
     return bool(re.match(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$', email.strip()))
 
 def validate_nickname(name: str) -> tuple[bool, str]:
-    """Validate Free Fire nickname."""
     name = name.strip()
     if len(name) < 2:
         return False, "الاسم قصير جداً (2+ أحرف)"
     if len(name) > 18:
         return False, "الاسم طويل جداً (18 حرف كحد أقصى)"
-    # Check for invalid characters
     if any(c in name for c in '\n\r\t'):
-        return False, "أحرف غير مسموحة في الاسم"
+        return False, "أحرف غير مسموحة"
     return True, name
