@@ -1,16 +1,15 @@
 """
-BOLT ⚡ — Database Module
-━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 Users, Tokens, Rewards, Activity
-👥 Admins Management
+BOLT  — Database Module
+ Users, Tokens, Rewards, Activity
+ Admins Management
  Tutorial Videos
-🚫 Bans (permanent/temporary with reason)
+ Bans (permanent/temporary with reason)
 """
 
 import os
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from crypto_utils import encrypt_token, decrypt_token, token_fingerprint
 
 DB_FILE = os.environ.get("DB_PATH", "bolt.db")
@@ -192,7 +191,6 @@ def set_onboarded(user_id: int, value: int = 1):
 # ─── Token Management ────────────────────────────────────────────────────────
 
 def set_token(user_id: int, token: str):
-    """Encrypt and store the access token."""
     enc = encrypt_token(token)
     fp = token_fingerprint(token)
     now = _now()
@@ -207,7 +205,6 @@ def set_token(user_id: int, token: str):
 
 
 def get_token(user_id: int) -> str | None:
-    """Decrypt and return the stored token."""
     with _lock:
         c = _conn()
         row = c.execute("SELECT encrypted_token FROM users WHERE user_id=?", (user_id,)).fetchone()
@@ -239,7 +236,6 @@ def has_token(user_id: int) -> bool:
 # ─── Admin Management ────────────────────────────────────────────────────────
 
 def is_admin(user_id: int) -> bool:
-    """Check if user is admin (owner or in admins table)."""
     owner = int(os.environ.get("OWNER_ID", "0"))
     if user_id == owner:
         return True
@@ -251,7 +247,6 @@ def is_admin(user_id: int) -> bool:
 
 
 def add_admin(user_id: int, added_by: int, permissions: str = "full") -> bool:
-    """Add user as admin. Returns True if successful."""
     if is_admin(user_id):
         return False
     with _lock:
@@ -264,7 +259,6 @@ def add_admin(user_id: int, added_by: int, permissions: str = "full") -> bool:
 
 
 def remove_admin(user_id: int) -> bool:
-    """Remove admin. Returns True if successful."""
     owner = int(os.environ.get("OWNER_ID", "0"))
     if user_id == owner:
         return False
@@ -277,7 +271,6 @@ def remove_admin(user_id: int) -> bool:
 
 
 def get_admins() -> list[dict]:
-    """Get all admins."""
     with _lock:
         c = _conn()
         rows = c.execute("SELECT * FROM admins ORDER BY added_at DESC").fetchall()
@@ -288,7 +281,6 @@ def get_admins() -> list[dict]:
 # ─── Tutorial Videos ─────────────────────────────────────────────────────────
 
 def get_tutorial_video(platform: str) -> str | None:
-    """Get tutorial video URL for platform (android/ios)."""
     with _lock:
         c = _conn()
         row = c.execute("SELECT video_url FROM tutorial_videos WHERE platform=?", (platform,)).fetchone()
@@ -297,7 +289,6 @@ def get_tutorial_video(platform: str) -> str | None:
 
 
 def update_tutorial_video(platform: str, video_url: str, updated_by: int):
-    """Update tutorial video URL."""
     with _lock:
         c = _conn()
         c.execute("""
@@ -311,7 +302,6 @@ def update_tutorial_video(platform: str, video_url: str, updated_by: int):
 # ─── Settings ────────────────────────────────────────────────────────────────
 
 def get_setting(key: str) -> str | None:
-    """Get setting value."""
     with _lock:
         c = _conn()
         row = c.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
@@ -320,7 +310,6 @@ def get_setting(key: str) -> str | None:
 
 
 def set_setting(key: str, value: str, updated_by: int):
-    """Set setting value."""
     with _lock:
         c = _conn()
         c.execute("""
@@ -334,23 +323,16 @@ def set_setting(key: str, value: str, updated_by: int):
 # ─── Ban System ─────────────────────────────────────────────────────────────
 
 def ban_user(user_id: int, banned_by: int, reason: str, duration_hours: float = None) -> bool:
-    """
-    Ban user.
-    duration_hours=None means permanent ban.
-    Returns True if successful.
-    """
     if is_admin(user_id):
         return False
     with _lock:
         c = _conn()
-        # Deactivate existing bans
         c.execute("UPDATE bans SET is_active=0 WHERE user_id=? AND is_active=1", (user_id,))
-        
+
         expires_at = None
         if duration_hours:
-            from datetime import timedelta
             expires_at = (datetime.now(timezone.utc) + timedelta(hours=duration_hours)).isoformat()
-        
+
         c.execute("""
             INSERT INTO bans (user_id, banned_by, reason, duration_hours, banned_at, expires_at, is_active)
             VALUES (?,?,?,?,?,?,1)
@@ -361,7 +343,6 @@ def ban_user(user_id: int, banned_by: int, reason: str, duration_hours: float = 
 
 
 def unban_user(user_id: int) -> bool:
-    """Unban user. Returns True if successful."""
     with _lock:
         c = _conn()
         c.execute("UPDATE bans SET is_active=0 WHERE user_id=? AND is_active=1", (user_id,))
@@ -371,39 +352,36 @@ def unban_user(user_id: int) -> bool:
 
 
 def is_banned(user_id: int) -> tuple[bool, str]:
-    """Check if user is banned. Returns (is_banned, reason)."""
     with _lock:
         c = _conn()
         row = c.execute("""
-            SELECT reason, expires_at, duration_hours FROM bans 
-            WHERE user_id=? AND is_active=1 
+            SELECT reason, expires_at, duration_hours FROM bans
+            WHERE user_id=? AND is_active=1
             ORDER BY id DESC LIMIT 1
         """, (user_id,)).fetchone()
         c.close()
-    
+
     if not row:
         return False, ""
-    
+
     reason = row["reason"]
     expires_at = row["expires_at"]
-    
-    # Check if expired
+
     if expires_at:
         if datetime.fromisoformat(expires_at) < datetime.now(timezone.utc):
             unban_user(user_id)
             return False, ""
-    
+
     return True, reason
 
 
 def get_bans(limit: int = 50) -> list[dict]:
-    """Get recent bans."""
     with _lock:
         c = _conn()
         rows = c.execute("""
-            SELECT b.*, u.username, u.first_name 
+            SELECT b.*, u.username, u.first_name
             FROM bans b LEFT JOIN users u ON b.user_id = u.user_id
-            WHERE b.is_active=1 
+            WHERE b.is_active=1
             ORDER BY b.id DESC LIMIT ?
         """, (limit,)).fetchall()
         c.close()
@@ -413,6 +391,7 @@ def get_bans(limit: int = 50) -> list[dict]:
 # ─── Daily Operations ────────────────────────────────────────────────────────
 
 DAILY_OP_LIMIT = 15
+
 
 def check_daily_ops(user_id: int) -> tuple[bool, int, int]:
     """Returns (allowed, remaining, limit)."""
@@ -486,11 +465,10 @@ def get_rewards(user_id: int) -> dict:
         c = _conn()
         row = c.execute("SELECT * FROM rewards WHERE user_id=?", (user_id,)).fetchone()
         c.close()
-    return dict(row) if row else {"user_id": user_id, "points": 0, "level": 1, "streak": 0, "last_daily": ""}
+    return dict(row) if row else {"user_id": user_id, "points": 0, "level": 1, "streak": 0, "last_daily": "", "total_earned": 0}
 
 
 def add_points(user_id: int, points: int, action: str, detail: str = ""):
-    """Add reward points."""
     with _lock:
         c = _conn()
         c.execute("UPDATE rewards SET points=points+?, total_earned=total_earned+? WHERE user_id=?",
@@ -500,7 +478,6 @@ def add_points(user_id: int, points: int, action: str, detail: str = ""):
 
 
 def claim_daily(user_id: int) -> tuple[bool, int]:
-    """Claim daily reward. Returns (success, points_earned)."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     with _lock:
         c = _conn()
@@ -512,7 +489,6 @@ def claim_daily(user_id: int) -> tuple[bool, int]:
             c.close()
             return False, 0
 
-        from datetime import timedelta
         yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
         streak = (row["streak"] + 1) if row["last_daily"] == yesterday else 1
         points = min(5 + streak, 15)
@@ -524,7 +500,7 @@ def claim_daily(user_id: int) -> tuple[bool, int]:
     return True, points
 
 
-# ─── Support Tickets ─────────────────────────────────────────────────────────
+# ─── Support Tickets ────────────────────────────────────────────────────────
 
 def create_ticket(user_id: int, subject: str, message: str) -> int:
     with _lock:
@@ -606,7 +582,6 @@ def leaderboard(limit: int = 10) -> list[dict]:
 
 
 def export_data() -> dict:
-    """Full data export (tokens stay encrypted)."""
     with _lock:
         c = _conn()
         data = {
