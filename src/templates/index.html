@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>eFootball Analyzer - Logs</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Segoe UI', Tahoma, sans-serif; background:#0a0e1a; color:#e0e6ed; }
+.header { background: linear-gradient(135deg,#0f1b3d 0%,#1a2a5c 100%); padding:20px; border-bottom:2px solid #2a4a8a; }
+.header h1 { font-size:22px; color:#4fc3f7; }
+.header p { font-size:13px; color:#8899aa; margin-top:6px; }
+.badges { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+.badge { padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600; }
+.badge-green { background:#1b5e20; color:#81c784; border:1px solid #2e7d32; }
+.badge-blue { background:#0d47a1; color:#90caf9; border:1px solid #1565c0; }
+.badge-gold { background:#f57f17; color:#fff; border:1px solid #ff8f00; }
+.stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:12px; padding:16px; }
+.stat-card { background:#111a33; border:1px solid #1e3a5f; border-radius:10px; padding:14px; text-align:center; }
+.stat-card .num { font-size:24px; font-weight:800; color:#4fc3f7; }
+.stat-card .label { font-size:11px; color:#8899aa; margin-top:4px; }
+.controls { padding:12px 16px; display:flex; gap:8px; flex-wrap:wrap; }
+.btn { padding:8px 16px; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; }
+.btn-primary { background:#1565c0; color:#fff; }
+.btn-danger { background:#c62828; color:#fff; }
+.btn-secondary { background:#263238; color:#90a4ae; border:1px solid #37474f; }
+.logs { padding:16px; }
+.log-card { background:#111a33; border:1px solid #1e3a5f; border-radius:10px; padding:14px; margin-bottom:10px; border-right:4px solid #1565c0; }
+.log-card.efootball { border-right-color:#2e7d32; background:#0f1f15; }
+.log-head { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; }
+.log-host { font-weight:700; color:#4fc3f7; font-size:14px; word-break:break-all; }
+.log-time { font-size:11px; color:#78909c; }
+.log-meta { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.meta { font-size:11px; padding:4px 8px; border-radius:6px; background:#1a2a4a; color:#b0bec5; border:1px solid #263859; }
+.meta.ok { background:#1b5e20; color:#a5d6a7; border-color:#2e7d32; }
+.meta.fail { background:#b71c1c; color:#ef9a9a; border-color:#c62828; }
+.cert { margin-top:10px; background:#0d1b2a; border:1px solid #1e3a5f; border-radius:8px; padding:10px; font-size:11px; }
+.cert-title { color:#ffca28; font-weight:700; margin-bottom:6px; }
+.cert-row { color:#b0bec5; margin:3px 0; }
+.cert-row span { color:#78909c; }
+.empty { text-align:center; padding:40px; color:#546e7a; }
+.empty .icon { font-size:40px; margin-bottom:10px; }
+.footer { text-align:center; padding:20px; font-size:11px; color:#546e7a; border-top:1px solid #1a2a4a; margin-top:20px; }
+.live { display:inline-block; width:8px; height:8px; background:#4caf50; border-radius:50%; margin-left:6px; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0% { opacity:1; } 50% { opacity:0.4; } 100% { opacity:1; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>⚡ eFootball Traffic Analyzer <span class="live"></span></h1>
+  <p>وضع القراءة فقط — بدون تعديل — آمن من الحظر — فلتر eFootball فقط</p>
+  <div class="badges">
+    <span class="badge badge-green">● READ-ONLY</span>
+    <span class="badge badge-blue">🔒 Certificate Info</span>
+    <span class="badge badge-gold">🎮 eFootball Only</span>
+    <span class="badge badge-blue">📱 iPhone 13</span>
+    <span class="badge badge-green">☁️ Railway $0</span>
+  </div>
+</div>
+
+<div class="stats" id="stats">
+  <div class="stat-card"><div class="num" id="s-total">{{ stats.total }}</div><div class="label">إجمالي الاتصالات</div></div>
+  <div class="stat-card"><div class="num" id="s-ef" style="color:#66bb6a">{{ stats.efootball }}</div><div class="label">eFootball</div></div>
+  <div class="stat-card"><div class="num" id="s-stored">{{ stats.stored }}</div><div class="label">محفوظة (آخر 500)</div></div>
+  <div class="stat-card"><div class="num" id="s-filter" style="font-size:14px">{{ stats.filter }}</div><div class="label">الفلتر</div></div>
+</div>
+
+<div class="controls">
+  <button class="btn btn-primary" onclick="fetchLogs()">🔄 تحديث</button>
+  <button class="btn btn-danger" onclick="clearLogs()">🗑️ مسح السجل</button>
+  <button class="btn btn-secondary" onclick="toggleAuto() " id="autoBtn">⏸️ إيقاف التحديث التلقائي</button>
+  <span style="font-size:11px; color:#78909c; margin-right:10px; align-self:center;">تحديث تلقائي كل 3 ثواني</span>
+</div>
+
+<div class="logs" id="logs">
+  {% if logs %}
+    {% for log in logs %}
+    <div class="log-card efootball">
+      <div class="log-head">
+        <span class="log-host">{{ log.method }} {{ log.host }}:{{ log.port }}</span>
+        <span class="log-time">{{ log.time_str }} — {{ log.date_str }}</span>
+      </div>
+      <div class="log-meta">
+        <span class="meta ok">{{ log.status }}</span>
+        <span class="meta">⏱️ {{ log.duration_ms or 0 }}ms</span>
+        <span class="meta">🎮 eFootball</span>
+        <span class="meta">{{ log.target[:60] }}</span>
+      </div>
+      {% if log.cert_info %}
+      <div class="cert">
+        <div class="cert-title">🔒 معلومات الشهادة — {{ log.cert_info.host }}</div>
+        {% if log.cert_info.status == 'ok' %}
+          <div class="cert-row"><span>Subject:</span> {{ log.cert_info.subject }}</div>
+          <div class="cert-row"><span>Issuer:</span> {{ log.cert_info.issuer }}</div>
+          <div class="cert-row"><span>Valid:</span> {{ log.cert_info.notBefore }} → {{ log.cert_info.notAfter }}</div>
+          <div class="cert-row"><span>Status:</span> <span style="color:#81c784">✔️ صالحة</span></div>
+        {% else %}
+          <div class="cert-row"><span>Status:</span> <span style="color:#ef9a9a">{{ log.cert_info.status }} — {{ log.cert_info.error or '' }}</span></div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty">
+      <div class="icon">📡</div>
+      <div>لا يوجد ترافيك eFootball بعد</div>
+      <div style="font-size:12px; margin-top:8px; color:#78909c;">اضبط iPhone على البروكسي ثم افتح eFootball — ستظهر الاتصالات هنا لحظياً</div>
+      <div style="font-size:11px; margin-top:12px; background:#111a33; display:inline-block; padding:8px 12px; border-radius:8px; border:1px solid #1e3a5f;">
+        الإعدادات > Wi-Fi > ⓘ > تكوين البروكسي > يدوي<br>
+        الخادم: <b style="color:#4fc3f7">xxx.up.railway.app</b> — المنفذ: <b style="color:#4fc3f7">{{ request.headers.get('host','') }}</b>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="footer">
+  eFootball Traffic Analyzer v3.0 — وضع القراءة فقط — لا يعدل أي بايت — آمن من الحظر<br>
+  يعمل على Railway • فلتر eFootball فقط • معلومات الشهادة لكل اتصال
+</div>
+
+<script>
+let auto = true;
+let timer = setInterval(fetchLogs, 3000);
+
+async function fetchLogs() {
+  try {
+    const r = await fetch('/api/logs?limit=50');
+    const j = await r.json();
+    document.getElementById('s-total').textContent = j.stats.total;
+    document.getElementById('s-ef').textContent = j.stats.efootball;
+    document.getElementById('s-stored').textContent = j.stats.stored;
+    
+    const container = document.getElementById('logs');
+    if (j.logs.length === 0) {
+      container.innerHTML = `<div class="empty"><div class="icon">📡</div><div>لا يوجد ترافيك eFootball بعد</div><div style="font-size:12px; margin-top:8px; color:#78909c;">افتح eFootball على الآيفون المتصل بالبروكسي</div></div>`;
+      return;
+    }
+    container.innerHTML = j.logs.map(log => `
+      <div class="log-card efootball">
+        <div class="log-head">
+          <span class="log-host">${log.method} ${log.host}:${log.port}</span>
+          <span class="log-time">${log.time_str} — ${log.date_str}</span>
+        </div>
+        <div class="log-meta">
+          <span class="meta ok">${log.status}</span>
+          <span class="meta">⏱️ ${log.duration_ms||0}ms</span>
+          <span class="meta">🎮 eFootball</span>
+          <span class="meta" style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${log.target}</span>
+        </div>
+        ${log.cert_info ? `
+        <div class="cert">
+          <div class="cert-title">🔒 ${log.cert_info.host}</div>
+          ${log.cert_info.status==='ok' ? `
+            <div class="cert-row"><span>Subject:</span> ${log.cert_info.subject}</div>
+            <div class="cert-row"><span>Issuer:</span> ${log.cert_info.issuer}</div>
+            <div class="cert-row"><span>Valid:</span> ${log.cert_info.notBefore} → ${log.cert_info.notAfter}</div>
+          ` : `<div class="cert-row"><span>Status:</span> ${log.cert_info.status} ${log.cert_info.error||''}</div>`}
+        </div>` : ''}
+      </div>
+    `).join('');
+  } catch(e) { console.log(e); }
+}
+
+async function clearLogs() {
+  if(!confirm('مسح كل السجلات؟')) return;
+  await fetch('/api/clear', {method:'POST'});
+  fetchLogs();
+}
+
+function toggleAuto() {
+  auto = !auto;
+  const btn = document.getElementById('autoBtn');
+  if(auto) {
+    timer = setInterval(fetchLogs, 3000);
+    btn.textContent = '⏸️ إيقاف التحديث التلقائي';
+  } else {
+    clearInterval(timer);
+    btn.textContent = '▶️ تشغيل التحديث التلقائي';
+  }
+}
+</script>
+</body>
+</html>
