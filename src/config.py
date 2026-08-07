@@ -2,15 +2,15 @@
 إعدادات المشروع - eFootball Traffic Analyzer
 تكلفة $0 - Railway + iPhone 13
 التحديث: 2026-08-07 - Africa/Algiers
-الإصدار: v3.1 Professional - Modern Decryption + File Organization
+الإصدار: v4.0 Integrated - كل الأفكار المفيدة متكاملة
 """
 import os
 from datetime import datetime
 
 # التاريخ
 TODAY = "2026-08-07"
-VERSION = "3.1.0"
-VERSION_NAME = "Professional Modern Decryption"
+VERSION = "4.0.0"
+VERSION_NAME = "Integrated Professional"
 
 # المنطقة الزمنية
 TIMEZONE = "Africa/Algiers"
@@ -19,10 +19,13 @@ TIMEZONE = "Africa/Algiers"
 PORT = int(os.environ.get("PORT", "8080"))
 
 # عدد السجلات المحفوظة في الذاكرة
-LOG_LIMIT = int(os.environ.get("LOG_LIMIT", "500"))
+LOG_LIMIT = int(os.environ.get("LOG_LIMIT", "800"))
 
 # هل نعرض فقط ترافيك eFootball؟
 EFOOTBALL_ONLY = os.environ.get("EFOOTBALL_ONLY", "true").lower() == "true"
+
+# حماية اللوحة (اختياري)
+DASHBOARD_TOKEN = os.environ.get("DASHBOARD_TOKEN", "").strip()
 
 # دومينات eFootball الرسمية - أي شيء خارجها يتم تجاهله عند تفعيل الفلتر
 EFOOTBALL_DOMAINS = [
@@ -51,6 +54,13 @@ CERT_TIMEOUT = 3
 # نظام فك التشفير الحديث
 MODERN_DECRYPT = True
 DECRYPT_MODE = "metadata"  # metadata فقط - بدون تعديل
+
+# التخزين المستمر
+PERSISTENT_STORAGE = True
+DATA_DIR = os.environ.get("DATA_DIR", "data")
+
+# التحليلات
+ANALYTICS_ENABLED = True
 
 def is_efootball_host(host: str) -> bool:
     """هل هذا Host يخص eFootball؟"""
@@ -90,10 +100,10 @@ def get_host_category(host: str) -> str:
 BANNER = f"""
 ╔════════════════════════════════════════════════╗
 ║  eFootball Traffic Analyzer v{VERSION}        ║
-║  {VERSION_NAME}                              ║
+║  {VERSION_NAME} - Integrated                 ║
 ║  Date: {TODAY} | {TIMEZONE}                  ║
-║  Mode: READ-ONLY + Modern Decryption         ║
-║  Filter: eFootball Only                      ║
+║  Mode: READ-ONLY + Modern Decrypt + Storage  ║
+║  Filter: eFootball Only | Live WS            ║
 ║  Port: {PORT} | Logs: {LOG_LIMIT}           ║
 ╚════════════════════════════════════════════════╝
 """
