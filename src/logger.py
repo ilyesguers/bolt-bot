@@ -8,7 +8,7 @@ import uuid
 import threading
 from collections import deque, Counter
 from typing import List, Dict, Any
-from .config import LOG_LIMIT, EFOOTBALL_ONLY, is_efootball_host, get_host_category, TODAY, PERSISTENT_STORAGE
+from .config import LOG_LIMIT, EFOOTBALL_ONLY, is_efootball_host, get_host_category, TODAY, PERSISTENT_STORAGE, VERSION
 
 try:
     from .storage import save_logs, load_logs, append_log
@@ -141,7 +141,7 @@ class LogStore:
                 "by_host": dict(self._by_host.most_common(5)),
                 "by_category": dict(self._by_category),
                 "today": TODAY,
-                "version": "4.0.0",
+                "version": VERSION,
                 "uptime_sec": uptime,
                 "uptime_str": f"{uptime//3600}h {(uptime%3600)//60}m",
             }

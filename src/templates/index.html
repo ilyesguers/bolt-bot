@@ -67,6 +67,29 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .group-head { display:flex; justify-content:space-between; align-items:center; }
 .group-name { font-weight:800; color:var(--accent); }
 .group-count { background:linear-gradient(135deg, var(--accent), var(--accent2)); color:#000; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:900; }
+.ai-panel { margin:0 16px 16px; padding:16px; background:linear-gradient(135deg,rgba(17,31,67,.92),rgba(8,19,48,.92)); border:1px solid rgba(179,136,255,.32); border-radius:18px; box-shadow:0 12px 36px rgba(0,0,0,.25); }
+.ai-panel-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.ai-panel-title { font-size:16px; font-weight:900; color:#d1c4e9; }
+.ai-panel-subtitle { margin-top:4px; color:var(--muted); font-size:11px; }
+.ai-notice { padding:10px 12px; margin-bottom:12px; border-radius:10px; border:1px solid rgba(255,202,40,.3); background:rgba(255,171,0,.09); color:#ffe082; font-size:11px; line-height:1.7; }
+.ai-layout { display:grid; grid-template-columns:minmax(0,2fr) minmax(240px,1fr); gap:12px; }
+.ai-feature-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:9px; }
+.ai-feature { display:flex; align-items:center; gap:9px; padding:11px; min-height:74px; border-radius:12px; border:1px solid var(--border); background:rgba(5,10,31,.58); cursor:pointer; transition:.2s; }
+.ai-feature:hover { border-color:rgba(179,136,255,.55); transform:translateY(-1px); }
+.ai-feature input { width:18px; height:18px; flex:0 0 auto; accent-color:#7c4dff; }
+.ai-feature-icon { font-size:23px; }
+.ai-feature-name { display:block; font-size:11px; font-weight:900; color:var(--text); }
+.ai-feature-desc { display:block; margin-top:3px; color:var(--muted); font-size:9px; line-height:1.5; }
+.ai-risk { margin-right:auto; padding:3px 6px; border-radius:7px; background:rgba(79,195,247,.1); color:#80d8ff; font-size:8px; white-space:nowrap; }
+.ai-actions { display:flex; align-items:center; gap:10px; margin-top:11px; flex-wrap:wrap; }
+.ai-save-status { font-size:10px; color:var(--muted); }
+.ai-notifications { max-height:234px; overflow:auto; padding:10px; border-radius:12px; background:rgba(5,10,31,.58); border:1px solid var(--border); }
+.ai-notifications h4 { margin-bottom:8px; color:var(--accent); font-size:11px; }
+.ai-notification { padding:8px 9px; margin-top:6px; border-right:2px solid var(--accent); border-radius:8px; background:rgba(10,20,51,.85); font-size:10px; line-height:1.5; }
+.ai-notification.success { border-right-color:#00e676; }
+.ai-notification.warning { border-right-color:#ffca28; }
+.ai-notification-time { color:var(--muted); font-size:8px; margin-top:2px; }
+@media (max-width:760px) { .ai-layout { grid-template-columns:1fr; } .ai-panel { margin:0 10px 12px; padding:12px; } .file-grid { grid-template-columns:1fr; } }
 .empty { text-align:center; padding:60px 20px; color:var(--muted); }
 .empty .icon { font-size:48px; margin-bottom:12px; animation:float 3s ease-in-out infinite; }
 .footer { text-align:center; padding:24px; font-size:11px; color:#546e7a; border-top:1px solid var(--border); margin-top:20px; background:rgba(10,20,51,0.3); }
@@ -100,6 +123,49 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
     <div class="chart"><h4>⚡ الأداء</h4><div id="chart-perf"></div></div>
   </div>
 </div>
+<section class="ai-panel" aria-labelledby="ai-panel-title">
+  <div class="ai-panel-head">
+    <div>
+      <div class="ai-panel-title" id="ai-panel-title">🎮 ميزات AI</div>
+      <div class="ai-panel-subtitle">خادم الرصد: pes22-game.cs.konami.net • التفضيلات محفوظة في data/features.json</div>
+    </div>
+    <span class="badge badge-purple">AI Analyzer v5.1</span>
+  </div>
+  <div class="ai-notice">⚠️ وضع واقعي وآمن للاتصال: داخل CONNECT نرى TLS ciphertext فقط. يحلل النظام الحجم وEntropy ويحفظ اختياراتك، لكنه لا يغيّر البايتات المشفرة لأن ذلك يفشل تحقق TLS ويقطع اللعبة.</div>
+  <div class="ai-layout">
+    <div>
+      <div class="ai-feature-grid" id="aiFeatureGrid">
+        {% for key, feature in ai_features.items() %}
+        <label class="ai-feature" for="feature-{{ key }}">
+          <input class="ai-checkbox" type="checkbox" id="feature-{{ key }}" data-feature="{{ key }}" {% if enabled_features.get(key) %}checked{% endif %}>
+          <span class="ai-feature-icon">{{ feature.icon }}</span>
+          <span>
+            <span class="ai-feature-name">{{ feature.name }}</span>
+            <span class="ai-feature-desc">{{ feature.desc }}</span>
+          </span>
+          <span class="ai-risk">{{ feature.risk }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="ai-actions">
+        <button class="btn btn-success" id="saveFeaturesBtn" onclick="saveAIFeatures()">💾 حفظ الميزات</button>
+        <span class="ai-save-status" id="aiSaveStatus">جاهز</span>
+      </div>
+    </div>
+    <div class="ai-notifications">
+      <h4>🔔 إشعارات AI المباشرة</h4>
+      <div id="aiNotifications">
+        {% if notifications %}
+          {% for item in notifications %}
+          <div class="ai-notification {{ item.level }}"><div>{{ item.msg }}</div><div class="ai-notification-time">{{ item.time }}</div></div>
+          {% endfor %}
+        {% else %}
+          <div style="color:var(--muted);font-size:10px;">لا إشعارات بعد — ستظهر عند رصد اتصال AI أو حفظ التفضيلات.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
 <div class="controls">
   <input id="search" placeholder="🔍 بحث في Host..." oninput="filterLogs()">
   <select id="catFilter" onchange="filterLogs()"><option value="all">كل التصنيفات</option><option value="api">api</option><option value="auth">auth</option><option value="shop">shop</option><option value="match">match</option><option value="cdn">cdn</option></select>
@@ -157,6 +223,13 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
             <div class="decrypt-row"><span>الطبقات:</span> {{ log.max_decrypt.layers.outer }} → {{ log.max_decrypt.layers.inner }}</div>
           </div>
           {% endif %}
+          {% if log.ai_analysis %}
+          <div class="decrypt" style="border-color:rgba(179,136,255,0.45); background:rgba(36,18,75,0.55);">
+            <div class="decrypt-title" style="color:#b388ff;">🎮 AI Analyzer <span class="score score-mid">تخمين {{ log.ai_analysis.confidence }}%</span></div>
+            <div class="decrypt-row"><span>Entropy:</span> {{ log.ai_analysis.entropy }} • {{ log.ai_analysis.server_bytes }} bytes</div>
+            <div class="decrypt-row"><span>الوضع:</span> Metadata only • TLS لم يُعدّل</div>
+          </div>
+          {% endif %}
         </div>
         {% endfor %}
       {% else %}
@@ -174,6 +247,20 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 </div>
 <script>
 let auto=true, timer=setInterval(fetchAll,2500), currentTab='all', ws=null;
+const dashboardToken = new URLSearchParams(location.search).get('token') || '';
+function apiUrl(path){
+  const url = new URL(path, location.origin);
+  if(dashboardToken) url.searchParams.set('token', dashboardToken);
+  return url.pathname + url.search;
+}
+function apiFetch(path, options={}){
+  const headers = new Headers(options.headers || {});
+  if(dashboardToken) headers.set('x-dashboard-token', dashboardToken);
+  return fetch(apiUrl(path), {...options, headers});
+}
+function escapeHTML(value){
+  return String(value ?? '').replace(/[&<>'"]/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+}
 function connectWS(){
   try{
     const proto = location.protocol==='https:'?'wss:':'ws:';
@@ -194,8 +281,12 @@ function switchTab(t){
 }
 async function fetchAll(){
   try{
-    const [a,b] = await Promise.all([fetch('/api/logs?limit=50').then(r=>r.json()), fetch('/api/files').then(r=>r.json())]);
-    updateStats(a.stats); renderAnalytics();
+    const [a,b,n] = await Promise.all([
+      apiFetch('/api/logs?limit=50').then(r=>r.json()),
+      apiFetch('/api/files').then(r=>r.json()),
+      apiFetch('/api/notifications').then(r=>r.json())
+    ]);
+    updateStats(a.stats); renderAnalytics(); renderNotifications(n.notifications || []);
     if(currentTab==='all') renderLogs(a.logs);
     if(currentTab==='files') renderFiles(b.files);
     if(currentTab==='grouped') renderGrouped(b.grouped);
@@ -212,7 +303,7 @@ function updateStats(s){
 }
 async function renderAnalytics(){
   try{
-    const j = await fetch('/api/analytics').then(r=>r.json());
+    const j = await apiFetch('/api/analytics').then(r=>r.json());
     if(j.empty) return;
     let catHtml=''; for(const [k,v] of Object.entries(j.by_category)){ const pct=Math.round(v/j.total*100); catHtml+=`<div class="bar"><span class="bar-label">${k}</span><div style="flex:1; background:rgba(10,20,51,0.8); border-radius:5px;"><div class="bar-fill" style="width:${pct}%"></div></div><span>${v}</span></div>`; }
     document.getElementById('chart-cat').innerHTML=catHtml||'لا بيانات';
@@ -220,6 +311,55 @@ async function renderAnalytics(){
     document.getElementById('chart-host').innerHTML=hostHtml||'لا بيانات';
     document.getElementById('chart-perf').innerHTML=`متوسط: <b>${j.avg_ms}ms</b> • أسرع: ${j.min_ms}ms • أبطأ: ${j.max_ms}ms<br>TLS 1.3: ${j.tls13_ratio}%`;
   }catch{}
+}
+async function loadAIFeatures(){
+  try{
+    const response = await apiFetch('/api/features');
+    if(!response.ok) throw new Error('تعذر تحميل الميزات');
+    const data = await response.json();
+    document.querySelectorAll('.ai-checkbox').forEach(input=>{
+      input.checked = data.state?.[input.dataset.feature] === true;
+    });
+  }catch(error){
+    document.getElementById('aiSaveStatus').textContent = error.message || 'تعذر تحميل الميزات';
+  }
+}
+async function saveAIFeatures(){
+  const button = document.getElementById('saveFeaturesBtn');
+  const status = document.getElementById('aiSaveStatus');
+  const state = {};
+  document.querySelectorAll('.ai-checkbox').forEach(input=>state[input.dataset.feature]=input.checked);
+  button.disabled = true;
+  status.textContent = 'جارٍ الحفظ...';
+  try{
+    const response = await apiFetch('/api/features', {
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({features:state})
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(typeof data.detail==='string' ? data.detail : 'فشل حفظ الميزات');
+    status.textContent = '✓ حُفظت التفضيلات — TLS ما زال passthrough';
+    await refreshNotifications();
+  }catch(error){
+    status.textContent = '✕ ' + (error.message || 'فشل الحفظ');
+  }finally{
+    button.disabled = false;
+  }
+}
+async function refreshNotifications(){
+  try{
+    const data = await apiFetch('/api/notifications').then(r=>r.json());
+    renderNotifications(data.notifications || []);
+  }catch{}
+}
+function renderNotifications(items){
+  const container = document.getElementById('aiNotifications');
+  if(!items.length){
+    container.innerHTML='<div style="color:var(--muted);font-size:10px;">لا إشعارات بعد — ستظهر عند رصد اتصال AI أو حفظ التفضيلات.</div>';
+    return;
+  }
+  container.innerHTML=items.map(item=>`<div class="ai-notification ${escapeHTML(item.level)}"><div>${escapeHTML(item.msg)}</div><div class="ai-notification-time">${escapeHTML(item.time)}</div></div>`).join('');
 }
 function renderLogs(logs){
   const c=document.getElementById('logs');
@@ -231,6 +371,7 @@ function renderLogs(logs){
       ${log.tls_info ? `<div class="decrypt"><div class="decrypt-title">🔓 ${log.tls_info.host} <span class="score ${log.tls_info.modern_score>70?'score-high':'score-mid'}">${log.tls_info.modern_score}/100</span></div><div class="decrypt-row"><span>SNI:</span> ${log.tls_info.sni}</div></div>`:''}
       ${log.advanced ? `<div class="decrypt" style="border-color:rgba(255,111,0,0.4);background:rgba(26,15,0,0.6);"><div class="decrypt-title" style="color:#ff9e00;">🧠 ${log.advanced.protocol_guess}</div><div class="decrypt-row"><span>الحجم:</span> ${log.advanced.size} bytes</div></div>`:''}
       ${log.max_decrypt ? `<div class="decrypt" style="border-color:rgba(0,230,118,0.4);background:rgba(0,42,20,0.6);"><div class="decrypt-title" style="color:#00e676;">🔬 ${log.max_decrypt.inner_guess} <span class="score score-high">${log.max_decrypt.confidence}%</span></div><div class="decrypt-row"><span>الطبقات:</span> ${log.max_decrypt.layers.inner}</div></div>`:''}
+      ${log.ai_analysis ? `<div class="decrypt" style="border-color:rgba(179,136,255,0.45);background:rgba(36,18,75,0.55);"><div class="decrypt-title" style="color:#b388ff;">🎮 AI Analyzer <span class="score score-mid">تخمين ${log.ai_analysis.confidence}%</span></div><div class="decrypt-row"><span>Entropy:</span> ${log.ai_analysis.entropy} • ${log.ai_analysis.server_bytes} bytes</div><div class="decrypt-row"><span>الوضع:</span> Metadata only • TLS لم يُعدّل</div></div>`:''}
     </div>
   `).join('');
 }
@@ -257,12 +398,13 @@ function filterLogs(){
   let url='/api/logs?limit=100';
   if(q) url+='&search='+encodeURIComponent(q);
   if(cat!=='all') url+='&category='+cat;
-  fetch(url).then(r=>r.json()).then(j=>{ updateStats(j.stats); renderLogs(j.logs); });
+  apiFetch(url).then(r=>r.json()).then(j=>{ updateStats(j.stats); renderLogs(j.logs); });
 }
-async function clearLogs(){ if(!confirm('مسح؟'))return; await fetch('/api/clear',{method:'POST'}); fetchAll(); }
-async function exportJSON(){ const r=await fetch('/api/export'); const j=await r.json(); const b=new Blob([JSON.stringify(j,null,2)],{type:'application/json'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`efootball_${j.export_date}.json`; a.click(); }
-async function exportCSV(){ location.href='/api/export/csv'; }
-function toggleAuto(){ auto=!auto; const btn=document.getElementById('autoBtn'); if(auto){ timer=setInterval(fetchAll,2500); btn.textContent='⏸️ تلقائي'; } else { clearInterval(timer); btn.textContent='▶️ تشغيل'; } }
+async function clearLogs(){ if(!confirm('مسح؟'))return; await apiFetch('/api/clear',{method:'POST'}); fetchAll(); }
+async function exportJSON(){ const r=await apiFetch('/api/export'); const j=await r.json(); const b=new Blob([JSON.stringify(j,null,2)],{type:'application/json'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`efootball_${j.export_date}.json`; a.click(); URL.revokeObjectURL(u); }
+async function exportCSV(){ location.href=apiUrl('/api/export/csv'); }
+function toggleAuto(){ auto=!auto; const btn=document.getElementById('autoBtn'); if(auto){ clearInterval(timer); timer=setInterval(fetchAll,2500); btn.textContent='⏸️ تلقائي'; } else { clearInterval(timer); btn.textContent='▶️ تشغيل'; } }
+loadAIFeatures();
 fetchAll();
 </script>
 </body>

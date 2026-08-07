@@ -1,5 +1,5 @@
 """
-eFootball Analyzer - Hybrid Server v5.0 Final
+eFootball Analyzer - Hybrid Server v5.1
 يجمع Proxy + Web على نفس PORT - 1000x Better
 """
 import asyncio
@@ -12,6 +12,8 @@ from .web import app
 from .logger import store
 from .advanced import analyze_payload_metadata
 from .max_decrypt import max_analyze, protection_max
+from .ai_analyzer import AIConnectionAnalyzer
+from .features import add_notification, get_enabled, is_ai_host
 
 async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     try:
@@ -63,30 +65,55 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                 tls_info = {"host": host, "sni": host, "status": "ok", "tls_version": "TLSv1.3", "cipher": {"name": "TLS_AES_256_GCM_SHA384", "bits": 256}, "modern_score": 96, "cert": {"subject": host, "issuer": "KONAMI Secure CA", "notBefore": "2026-01-01", "notAfter": "2027-01-01", "san": [host]}}
             prot = protection_max()
 
+            ai_tracker = None
+            if is_connect and is_ai_host(host):
+                enabled_features = get_enabled()
+                ai_tracker = AIConnectionAnalyzer(
+                    host,
+                    enabled_features,
+                    encrypted_tunnel=True,
+                )
+                add_notification(
+                    "تم رصد اتصال خادم AI — تحليل TLS metadata بدون تعديل البايتات",
+                    level="warning" if enabled_features else "info",
+                    host=host,
+                    requested_features=enabled_features,
+                )
+
             if is_connect:
                 try:
                     remote_reader, remote_writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=5)
                     writer.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
                     await writer.drain()
-                    async def relay(r, w):
+                    async def relay(r, w, direction):
                         nonlocal total_relay
                         try:
                             while True:
                                 chunk = await r.read(16384)
-                                if not chunk: break
+                                if not chunk:
+                                    break
                                 total_relay += len(chunk)
+                                if ai_tracker is not None:
+                                    chunk = ai_tracker.process(chunk, direction)
                                 w.write(chunk)
                                 await w.drain()
-                        except: pass
+                        except:
+                            pass
                         finally:
-                            try: w.close()
-                            except: pass
-                    await asyncio.gather(relay(reader, remote_writer), relay(remote_reader, writer))
+                            try:
+                                w.close()
+                            except:
+                                pass
+                    await asyncio.gather(
+                        relay(reader, remote_writer, "client_to_server"),
+                        relay(remote_reader, writer, "server_to_client"),
+                    )
+                    ai_analysis = ai_tracker.result() if ai_tracker is not None else None
                     if should_log:
                         duration_ms = int((time.time()-start)*1000)
                         adv = analyze_payload_metadata(total_relay or len(data), duration_ms, tls_info["tls_version"] if tls_info else "TLSv1.3")
                         max_adv = max_analyze(host, total_relay or len(data), duration_ms, "tunnel")
-                        store.add({"method": method, "host": host, "port": port, "target": target, "status": "TUNNEL OK", "duration_ms": duration_ms, "cert_info": tls_info.get("cert") if tls_info else None, "tls_info": tls_info, "advanced": adv, "max_decrypt": max_adv, "protection": prot, "bytes_client": len(data), "bytes_relay": total_relay, "category": get_host_category(host), "clean_host": host.split(":")[0] if ":" in host else host})
+                        store.add({"method": method, "host": host, "port": port, "target": target, "status": "TUNNEL OK", "duration_ms": duration_ms, "cert_info": tls_info.get("cert") if tls_info else None, "tls_info": tls_info, "advanced": adv, "max_decrypt": max_adv, "protection": prot, "bytes_client": len(data), "bytes_relay": total_relay, "ai_analysis": ai_analysis, "category": get_host_category(host), "clean_host": host.split(":")[0] if ":" in host else host})
                     return
                 except Exception as e:
                     if should_log:
@@ -158,7 +185,7 @@ def start_web_in_thread():
 
 async def main():
     print(BANNER)
-    print(f"[MAIN] Hybrid on 0.0.0.0:{PORT} - Beautiful Integrated v5.0")
+    print(f"[MAIN] Hybrid on 0.0.0.0:{PORT} - AI Analyzer v5.1")
     t = threading.Thread(target=start_web_in_thread, daemon=True)
     t.start()
     await asyncio.sleep(2)

@@ -1,13 +1,13 @@
 """
 eFootball Traffic Analyzer - Final Edition
-2026-08-07 - Africa/Algiers - iPhone 13 + Railway $0
-v5.0 Final - 1000x Better - Beautiful & Integrated
+2026-08-08 - Africa/Algiers - iPhone 13 + Railway $0
+v5.1 - AI Traffic Metadata + Feature Controls
 """
 import os
 
-TODAY = "2026-08-07"
-VERSION = "5.0.0"
-VERSION_NAME = "Final Beautiful Integrated"
+TODAY = "2026-08-08"
+VERSION = "5.1.0"
+VERSION_NAME = "AI Traffic Metadata + Feature Controls"
 TIMEZONE = "Africa/Algiers"
 PORT = int(os.environ.get("PORT", "8080"))
 LOG_LIMIT = int(os.environ.get("LOG_LIMIT", "800"))
@@ -56,9 +56,9 @@ def get_host_category(host: str) -> str:
 
 BANNER = f"""
 ╔════════════════════════════════════════════════════╗
-║  eFootball Traffic Analyzer v{VERSION} Final      ║
-║  {VERSION_NAME} - 1000x Better                   ║
-║  {TODAY} | {TIMEZONE} | iPhone 13 | Railway $0  ║
-║  Maximum Decrypt + Stealth MAX + Beautiful      ║
+║  eFootball Traffic Analyzer v{VERSION}            ║
+║  {VERSION_NAME}                                   ║
+║  {TODAY} | {TIMEZONE} | iPhone 13 | Railway $0    ║
+║  TLS Metadata + AI Feature Controls               ║
 ╚════════════════════════════════════════════════════╝
 """

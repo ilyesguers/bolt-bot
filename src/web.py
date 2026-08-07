@@ -1,13 +1,12 @@
 """
-Web Dashboard - FastAPI - Integrated v4.0
-Live WebSocket + Analytics + Storage + Auth
-2026-08-07
+Web Dashboard - FastAPI - Integrated v5.1
+Live WebSocket + Analytics + AI Feature Controls + Auth
+2026-08-08
 """
-from fastapi import FastAPI, Request, Query, WebSocket, WebSocketDisconnect, Depends
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi import FastAPI, Request, Query, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
-import time
 import json
 import asyncio
 import csv
@@ -17,6 +16,14 @@ from .config import EFOOTBALL_ONLY, EFOOTBALL_DOMAINS, TODAY, VERSION, VERSION_N
 from .logger import store
 from .analytics import compute_analytics
 from .auth import check_auth
+from .features import (
+    FEATURES,
+    add_notification,
+    get_enabled,
+    get_notifications,
+    load_features,
+    save_features,
+)
 
 app = FastAPI(
     title="eFootball Traffic Analyzer",
@@ -104,6 +111,70 @@ async def api_config(auth=Depends(check_auth)):
         "features": ["Live WebSocket","Persistent Storage","Analytics Charts","File Organization","Modern Decrypt","Auto Update","CSV Export","Auth"],
     }
 
+def _features_response():
+    state = load_features()
+    return {
+        "features": FEATURES,
+        "state": state,
+        "enabled": [key for key, value in state.items() if value],
+        "mode": "metadata_only",
+        "can_modify_tls": False,
+        "notice": "CONNECT/TLS مشفر؛ التفضيلات محفوظة لكن ciphertext يمر دون تعديل.",
+    }
+
+
+@app.get("/api/features")
+async def api_features(auth=Depends(check_auth)):
+    return _features_response()
+
+
+@app.post("/api/features")
+async def api_features_update(request: Request, auth=Depends(check_auth)):
+    try:
+        payload = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="JSON body مطلوب")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="يجب إرسال JSON object")
+
+    values = payload.get("features", payload)
+    if not isinstance(values, dict):
+        raise HTTPException(status_code=422, detail="features يجب أن تكون object")
+
+    unknown = sorted(set(values) - set(FEATURES))
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "ميزات غير معروفة", "keys": unknown},
+        )
+
+    invalid = sorted(key for key, value in values.items() if type(value) is not bool)
+    if invalid:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "قيم الميزات يجب أن تكون true/false", "keys": invalid},
+        )
+
+    state = load_features()
+    state.update(values)
+    saved = save_features(state)
+    enabled_names = [FEATURES[key]["name"] for key, value in saved.items() if value]
+    add_notification(
+        "تم حفظ تفضيلات ميزات AI"
+        + (f": {', '.join(enabled_names)}" if enabled_names else " — جميعها متوقفة"),
+        level="success",
+        enabled=get_enabled(),
+    )
+    return _features_response()
+
+
+@app.get("/api/notifications")
+async def api_notifications(auth=Depends(check_auth)):
+    items = get_notifications()
+    return {"notifications": items, "count": len(items)}
+
+
 @app.get("/api/export")
 async def api_export(auth=Depends(check_auth)):
     return {"export_date": TODAY, "version": VERSION, "logs": store.get_all(limit=800), "stats": store.get_stats()}
@@ -141,6 +212,9 @@ async def dashboard(request: Request, auth=Depends(check_auth)):
         "today": TODAY,
         "version": VERSION,
         "version_name": VERSION_NAME,
+        "ai_features": FEATURES,
+        "enabled_features": load_features(),
+        "notifications": get_notifications(),
     })
 
 # صفحة بسيطة للهاتف
@@ -156,4 +230,7 @@ async def mobile(request: Request, auth=Depends(check_auth)):
         "today": TODAY,
         "version": VERSION,
         "version_name": VERSION_NAME,
+        "ai_features": FEATURES,
+        "enabled_features": load_features(),
+        "notifications": get_notifications(),
     })
