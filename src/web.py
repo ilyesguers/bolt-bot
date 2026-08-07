@@ -1,6 +1,6 @@
 """
-Web Dashboard - FastAPI - Integrated v5.1
-Live WebSocket + Analytics + AI Feature Controls + Auth
+Web Dashboard - FastAPI - Integrated v5.2
+Live WebSocket (stats + logs + notifications) + Analytics + AI Feature Engine + Auth
 2026-08-08
 """
 from fastapi import FastAPI, Request, Query, WebSocket, WebSocketDisconnect, Depends, HTTPException
@@ -16,13 +16,19 @@ from .config import EFOOTBALL_ONLY, EFOOTBALL_DOMAINS, TODAY, VERSION, VERSION_N
 from .logger import store
 from .analytics import compute_analytics
 from .auth import check_auth
+from .match_tracker import tracker
 from .features import (
     FEATURES,
+    TARGETS,
+    TIMINGS,
     add_notification,
+    feature_statuses,
     get_enabled,
+    get_last_analysis,
     get_notifications,
     load_features,
-    save_features,
+    load_prefs,
+    save_prefs,
 )
 
 app = FastAPI(
@@ -54,13 +60,19 @@ class WSManager:
 
 ws_manager = WSManager()
 
-# خلفية ترسل تحديثات كل ثانيتين
+# خلفية ترسل تحديثات كل ثانيتين (إشعارات + حالة مباراة + سجلات)
 async def ws_broadcaster():
     while True:
         await asyncio.sleep(2)
         if ws_manager.active:
             try:
-                data = {"type":"update","stats": store.get_stats(), "logs": store.get_all(limit=10)}
+                data = {
+                    "type": "update",
+                    "stats": store.get_stats(),
+                    "logs": store.get_all(limit=10),
+                    "notifications": get_notifications(),
+                    "match": tracker.snapshot(),
+                }
                 await ws_manager.broadcast(data)
             except:
                 pass
@@ -104,22 +116,34 @@ async def api_config(auth=Depends(check_auth)):
     return {
         "filter": "eFootball Only" if EFOOTBALL_ONLY else "All",
         "domains": EFOOTBALL_DOMAINS,
-        "mode": "INTEGRATED - READ-ONLY + Modern Decrypt + Live WS + Storage",
+        "mode": "INTEGRATED - READ-ONLY + Feature Engine + Live WS + Storage",
         "version": VERSION,
         "version_name": VERSION_NAME,
         "today": TODAY,
-        "features": ["Live WebSocket","Persistent Storage","Analytics Charts","File Organization","Modern Decrypt","Auto Update","CSV Export","Auth"],
+        "features": ["Live WebSocket","Persistent Storage","Analytics Charts","File Organization","Modern Decrypt","Auto Update","CSV Export","Auth","Match Phase Estimator","Feature Status"],
     }
+
 
 def _features_response():
     state = load_features()
+    prefs = load_prefs()
+    analysis = get_last_analysis()
+    match = tracker.snapshot()
+    statuses = feature_statuses(analysis, match["phase"])
     return {
         "features": FEATURES,
         "state": state,
+        "targets": prefs["targets"],
+        "timings": prefs["timings"],
         "enabled": [key for key, value in state.items() if value],
         "mode": "metadata_only",
         "can_modify_tls": False,
-        "notice": "CONNECT/TLS مشفر؛ التفضيلات محفوظة لكن ciphertext يمر دون تعديل.",
+        "phase": match,
+        "statuses": statuses,
+        "targets_def": TARGETS,
+        "timings_def": TIMINGS,
+        "last_analysis": analysis,
+        "notice": "CONNECT/TLS مشفر؛ ميزات التعديل تُحفظ لكن ciphertext يمر دون تعديل. ميزات الرصد (تنبيهات/أطوار/بينغ) تعمل على الميتاداتا.",
     }
 
 
@@ -138,28 +162,55 @@ async def api_features_update(request: Request, auth=Depends(check_auth)):
     if not isinstance(payload, dict):
         raise HTTPException(status_code=422, detail="يجب إرسال JSON object")
 
-    values = payload.get("features", payload)
-    if not isinstance(values, dict):
+    # الصيغة الجديدة: {"features": {...}, "targets": {...}, "timings": {...}}
+    # الصيغة القديمة: {"slow_ai": true, ...}
+    if "features" in payload and isinstance(payload["features"], dict):
+        features_raw = payload.get("features")
+        targets_raw = payload.get("targets", {})
+        timings_raw = payload.get("timings", {})
+    else:
+        features_raw = payload
+        targets_raw = {}
+        timings_raw = {}
+
+    if not isinstance(features_raw, dict):
         raise HTTPException(status_code=422, detail="features يجب أن تكون object")
 
-    unknown = sorted(set(values) - set(FEATURES))
+    unknown = sorted(set(features_raw) - set(FEATURES))
     if unknown:
         raise HTTPException(
             status_code=422,
             detail={"message": "ميزات غير معروفة", "keys": unknown},
         )
-
-    invalid = sorted(key for key, value in values.items() if type(value) is not bool)
+    invalid = sorted(key for key, value in features_raw.items() if type(value) is not bool)
     if invalid:
         raise HTTPException(
             status_code=422,
             detail={"message": "قيم الميزات يجب أن تكون true/false", "keys": invalid},
         )
 
-    state = load_features()
-    state.update(values)
-    saved = save_features(state)
-    enabled_names = [FEATURES[key]["name"] for key, value in saved.items() if value]
+    if targets_raw:
+        if not isinstance(targets_raw, dict):
+            raise HTTPException(status_code=422, detail="targets يجب أن تكون object")
+        unknown_t = sorted(set(targets_raw) - set(FEATURES))
+        if unknown_t:
+            raise HTTPException(status_code=422, detail={"message": "أهداف غير معروفة", "keys": unknown_t})
+        invalid_t = sorted(key for key, value in targets_raw.items() if value not in TARGETS)
+        if invalid_t:
+            raise HTTPException(status_code=422, detail={"message": "قيم أهداف غير صالحة", "keys": invalid_t})
+
+    if timings_raw:
+        if not isinstance(timings_raw, dict):
+            raise HTTPException(status_code=422, detail="timings يجب أن تكون object")
+        unknown_ti = sorted(set(timings_raw) - set(FEATURES))
+        if unknown_ti:
+            raise HTTPException(status_code=422, detail={"message": "توقيتات غير معروفة", "keys": unknown_ti})
+        invalid_ti = sorted(key for key, value in timings_raw.items() if value not in TIMINGS)
+        if invalid_ti:
+            raise HTTPException(status_code=422, detail={"message": "قيم توقيت غير صالحة", "keys": invalid_ti})
+
+    saved = save_prefs(features=features_raw, targets=targets_raw, timings=timings_raw)
+    enabled_names = [FEATURES[key]["name"] for key, value in saved["features"].items() if value]
     add_notification(
         "تم حفظ تفضيلات ميزات AI"
         + (f": {', '.join(enabled_names)}" if enabled_names else " — جميعها متوقفة"),
@@ -173,6 +224,16 @@ async def api_features_update(request: Request, auth=Depends(check_auth)):
 async def api_notifications(auth=Depends(check_auth)):
     items = get_notifications()
     return {"notifications": items, "count": len(items)}
+
+
+@app.get("/api/match")
+async def api_match(auth=Depends(check_auth)):
+    analysis = get_last_analysis()
+    return {
+        "match": tracker.snapshot(),
+        "last_ai_analysis": analysis,
+        "statuses": feature_statuses(analysis, tracker.snapshot()["phase"]),
+    }
 
 
 @app.get("/api/export")
@@ -199,10 +260,8 @@ async def ws_live(ws: WebSocket):
     except WebSocketDisconnect:
         ws_manager.disconnect(ws)
 
-@app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, auth=Depends(check_auth)):
-    # نقل التوكن للواجهة
-    return templates.TemplateResponse(request, "index.html", {
+def _dashboard_context():
+    return {
         "stats": store.get_stats(),
         "logs": store.get_all(limit=50),
         "files": store.get_files()[:50],
@@ -214,23 +273,18 @@ async def dashboard(request: Request, auth=Depends(check_auth)):
         "version_name": VERSION_NAME,
         "ai_features": FEATURES,
         "enabled_features": load_features(),
+        "targets_def": TARGETS,
+        "timings_def": TIMINGS,
+        "prefs": load_prefs(),
+        "match": tracker.snapshot(),
         "notifications": get_notifications(),
-    })
+    }
+
+@app.get("/", response_class=HTMLResponse)
+async def dashboard(request: Request, auth=Depends(check_auth)):
+    return templates.TemplateResponse(request, "index.html", _dashboard_context())
 
 # صفحة بسيطة للهاتف
 @app.get("/m", response_class=HTMLResponse)
 async def mobile(request: Request, auth=Depends(check_auth)):
-    return templates.TemplateResponse(request, "index.html", {
-        "stats": store.get_stats(),
-        "logs": store.get_all(limit=30),
-        "files": store.get_files()[:30],
-        "grouped": store.get_grouped(),
-        "is_efootball_only": EFOOTBALL_ONLY,
-        "domains": EFOOTBALL_DOMAINS,
-        "today": TODAY,
-        "version": VERSION,
-        "version_name": VERSION_NAME,
-        "ai_features": FEATURES,
-        "enabled_features": load_features(),
-        "notifications": get_notifications(),
-    })
+    return templates.TemplateResponse(request, "index.html", _dashboard_context())

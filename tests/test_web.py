@@ -25,7 +25,7 @@ class FeatureAPITests(unittest.TestCase):
     def test_get_and_post_features(self):
         initial = self.client.get("/api/features")
         self.assertEqual(initial.status_code, 200)
-        self.assertEqual(len(initial.json()["features"]), 5)
+        self.assertEqual(len(initial.json()["features"]), 9)
         self.assertFalse(initial.json()["can_modify_tls"])
 
         updated = self.client.post(
@@ -58,7 +58,34 @@ class FeatureAPITests(unittest.TestCase):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn("🎮 ميزات AI", response.text)
-        self.assertEqual(response.text.count('class="ai-checkbox"'), 5)
+        self.assertEqual(response.text.count('class="ai-checkbox"'), 9)
+
+    def test_post_accepts_targets_and_timings(self):
+        updated = self.client.post(
+            "/api/features",
+            json={
+                "features": {"slow_ai": True},
+                "targets": {"slow_ai": "opponent"},
+                "timings": {"slow_ai": "late"},
+            },
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json()["targets"]["slow_ai"], "opponent")
+        self.assertEqual(updated.json()["timings"]["slow_ai"], "late")
+
+        rejected = self.client.post(
+            "/api/features",
+            json={"features": {"slow_ai": True}, "targets": {"slow_ai": "bogus"}},
+        )
+        self.assertEqual(rejected.status_code, 422)
+
+    def test_match_endpoint_reports_phase_and_statuses(self):
+        response = self.client.get("/api/match")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["match"]["phase"], "idle")
+        self.assertTrue(body["match"]["heuristic"])
+        self.assertEqual(len(body["statuses"]), 9)
 
 
 if __name__ == "__main__":

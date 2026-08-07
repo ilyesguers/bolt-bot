@@ -1,34 +1,36 @@
-# ⚡ eFootball Traffic Analyzer — v5.1
+# ⚡ eFootball Traffic Analyzer — v5.2
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-5.1.0-00E676?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-5.2.0-00E676?style=for-the-badge)
 ![Build](https://img.shields.io/badge/build-passing-2962FF?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-Railway%20%7C%20iPhone%2013-0A1433?style=for-the-badge)
 ![Date](https://img.shields.io/badge/date-2026--08--08-FFCA28?style=for-the-badge)
 
-**Proxy passthrough + Dashboard + AI-host traffic metadata + persistent feature preferences**
+**Proxy passthrough + Dashboard + AI-host traffic metadata + Feature Engine (target/timing) + Live Match Phase + Real Notifications**
 
 </div>
 
 ---
 
-## ما الجديد في v5.1
+## ما الجديد في v5.2
 
-- `src/ai_analyzer.py`: اكتشاف `pes22-game.cs.konami.net`، عينة محدودة إلى 1024 بايت، Entropy وإحصاءات الاتجاهين.
-- `src/features.py`: خمس تفضيلات AI محفوظة ذرياً في `data/features.json` مع إشعارات محدودة في الذاكرة.
-- تحليل اتصال AI في مساري التشغيل الفعليين: `src/main.py` و`src/proxy.py`.
-- `GET/POST /api/features` و`GET /api/notifications` مع تحقق من المدخلات والحماية الحالية للوحة.
-- لوحة عربية متجاوبة فيها خمسة checkboxes وزر حفظ وإشعارات مباشرة.
+- **إشعارات حقيقية تصل فعلاً**: `WS /ws/live` أصبح يدفع الإشعارات + حالة المباراة كل ثانيتين، واللوحة تعرض Toast منبثقة لأي إشعار جديد — لن تفوتك أي معلومة بعد الآن.
+- **تقرير ميزات لكل اتصال AI**: عند كل اتصال بخادم AI يظهر إشعار ملخص (نشطة/بانتظار التوقيت/محجوبة) + جدول "حالة كل ميزة" يشرح سبب التطبيق أو الحجب (TLS مشفر / الخصم خارج جهازك / التوقيت).
+- **`src/match_tracker.py`**: متتبع أطوار المباراة تقديرياً من شكل الترافيك (بداية → شوط أول → استراحة → شوط ثاني → نهاية) مع أحداث في الخط الزمني وإشعارات عند كل انتقال.
+- **هدف وتوقيت لكل ميزة**: `عليك / على الخصم / كلاهما` و`فوراً / بدري / متأخر` — يُحفظان في `data/features.json` ويقودان نافذة تفعيل الميزة فعلياً.
+- **4 ميزات رصد جديدة تعمل داخل CONNECT** (بدون لمس البايتات): تنبيه بداية المباراة ⚽، تنبيه نهاية المباراة 🏁، متابعة المباراة الحية 📡، قياس بينغ الخادم 📶.
+- `GET /api/match`: طور المباراة الحالي + الخط الزمني + حالة الميزات.
 
-## حدود تقنية مهمة
+## حدود تقنية مهمة (اقرأها قبل أن تطلب "ميزات أسطورية")
 
-اتصال HTTPS عبر `CONNECT` هو **نفق TLS مشفّر**. البروكسي الحالي يستطيع رؤية المضيف، الحجم، التوقيت وشكل ciphertext، لكنه لا يرى حقول اللعب أو قرار AI. في TLS 1.3، تعديل بايت عشوائي في ciphertext يفشل تحقق AEAD ويؤدي إلى إنهاء الاتصال؛ لذلك:
+اتصال HTTPS عبر `CONNECT` هو **نفق TLS مشفّر**. البروكسي يستطيع رؤية المضيف، الحجم، التوقيت وشكل ciphertext، لكنه **لا يرى حقول اللعب أو قرار AI**، و**لا يستطيع تعديلها بأمان**:
 
-- حركة CONNECT تمر byte-for-byte من دون تعديل.
-- تصنيف `AI Match Data / BehaviorTree / Config` تخمين مبني على الحجم وEntropy، وليس إثباتاً لبروتوكول داخلي.
-- اختيارات لوحة AI تُحفظ وتظهر في التحليل، لكنها لا تُطبّق على TLS ciphertext.
-- `modify_ai_payload()` موجود فقط لعينات مفكوكة/Offline؛ الـoffsets التجريبية ليست مخططاً موثقاً لبروتوكول KONAMI.
+- في TLS 1.3، تعديل أي بايت في ciphertext يفشل تحقق AEAD ويقطع الاتصال فوراً → المباراة تنتهي بفصل، لا بفوز.
+- **لا يمكن تعديل أي شيء على جهاز الخصم من بروكسيك**: الخصم له اتصال مستقل بسيرفر KONAMI، والسيرفر هو المرجع النهائي لكل القيم (Server-Side Verified). أي "ميزة على الخصم" من جهازك مستحيلة فيزيائياً — هذا ليس عيب برمجي.
+- لذلك ميزات **التعديل** (إبطاء AI، ستامينا، تسديد يخطئ، AI لا يضغط) تُحفظ وتُحلل وتُطبَّق على عينات مفكوكة/Offline فقط، وتظهر حالتها الحقيقية (`محجوبة — TLS مشفر`) في لوحة "حالة كل ميزة".
+- ميزات **الرصد** (تنبيه البداية/النهاية، متابعة المباراة، البينغ) تعمل فعلاً على الميتاداتا (أحجام، توقيت، فجوات) وتوصّل إشعارات حقيقية.
+- "أطوار المباراة" **تقدير** مبني على شكل الترافيك (حجم الدفعات والفجوات الزمنية)، وليست قراءة لبروتوكول KONAMI الداخلي.
 - لا توجد مطالبة بأن التشغيل أو الحساب محميان من الحظر؛ استخدام أدوات طرف ثالث يجب أن يراعي شروط الخدمة.
 
 ---
@@ -98,10 +100,11 @@ python -m src.main
 | `GET /api/logs` | السجلات والبحث |
 | `GET /api/analytics` | التحليلات |
 | `GET /api/files` | الملفات والمجموعات |
-| `GET /api/features` | تعريفات الميزات وحالتها |
-| `POST /api/features` | حفظ قيم `true/false` |
+| `GET /api/features` | تعريفات الميزات + الحالة + الأهداف + التوقيتات + أطوار المباراة |
+| `POST /api/features` | حفظ `{"features":{...},"targets":{...},"timings":{...}}` |
 | `GET /api/notifications` | آخر عشرة إشعارات AI |
-| `WS /ws/live` | تحديثات مباشرة |
+| `GET /api/match` | طور المباراة التقديري + الخط الزمني + حالة الميزات |
+| `WS /ws/live` | تحديثات مباشرة (إحصائيات + سجلات + إشعارات + طور المباراة) |
 | `GET /api/export/csv` | تصدير CSV |
 
 مثال:
@@ -109,7 +112,7 @@ python -m src.main
 ```bash
 curl -X POST http://localhost:8080/api/features \
   -H 'content-type: application/json' \
-  -d '{"features":{"slow_ai":true,"show_ai":false,"no_press":false,"stamina":false,"ai_miss":false}}'
+  -d '{"features":{"slow_ai":true,"match_end_alert":true},"targets":{"slow_ai":"me"},"timings":{"slow_ai":"late","match_end_alert":"late"}}'
 ```
 
 ---
@@ -128,7 +131,8 @@ src/
   main.py             Hybrid entry point
   proxy.py            Standalone proxy handler
   ai_analyzer.py      Bounded AI-host metadata analyzer
-  features.py         Preferences + notifications
+  match_tracker.py    Match phase estimator (heuristic) + timing gate
+  features.py         Preferences, targets/timings, per-feature status + notifications
   web.py              FastAPI + feature APIs
   templates/index.html
 ```

@@ -89,6 +89,30 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .ai-notification.success { border-right-color:#00e676; }
 .ai-notification.warning { border-right-color:#ffca28; }
 .ai-notification-time { color:var(--muted); font-size:8px; margin-top:2px; }
+.match-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 12px; padding:11px 13px; border-radius:12px; background:rgba(5,10,31,.6); border:1px solid rgba(79,195,247,.25); }
+.match-phase { font-size:13px; font-weight:900; color:#4fc3f7; }
+.match-chip { font-size:9px; color:var(--muted); background:rgba(10,20,51,.8); border:1px solid var(--border); padding:3px 9px; border-radius:14px; }
+.match-timeline { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+.match-timeline span { font-size:8px; color:#b0bec5; background:rgba(10,20,51,.8); border:1px solid var(--border); padding:2px 8px; border-radius:10px; }
+.feature-opts { display:flex; gap:6px; margin-top:7px; flex-wrap:wrap; }
+.feature-opts select { background:rgba(5,10,31,.9); border:1px solid var(--border); color:var(--text); padding:4px 6px; border-radius:8px; font-size:9px; max-width:130px; }
+.ai-status-list { margin-top:11px; display:grid; gap:6px; }
+.ai-status-row { display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:9px; background:rgba(5,10,31,.55); border:1px solid var(--border); font-size:10px; }
+.ai-status-row .st-icon { font-size:16px; }
+.ai-status-row .st-name { font-weight:800; min-width:118px; }
+.ai-status-row .st-why { color:var(--muted); font-size:9px; flex:1; line-height:1.5; }
+.st-chip { padding:3px 9px; border-radius:12px; font-size:8px; font-weight:900; white-space:nowrap; }
+.st-active { background:rgba(124,77,255,.18); color:#d1c4e9; border:1px solid rgba(179,136,255,.4); }
+.st-applied { background:rgba(0,230,118,.15); color:#69f0ae; border:1px solid rgba(0,230,118,.35); }
+.st-blocked_tls, .st-blocked_opponent { background:rgba(255,111,0,.14); color:#ff9e00; border:1px solid rgba(255,111,0,.35); }
+.st-wait_timing { background:rgba(79,195,247,.14); color:#4fc3f7; border:1px solid rgba(79,195,247,.35); }
+.st-ui_only, .st-disabled { background:rgba(144,164,174,.12); color:#90a4ae; border:1px solid rgba(144,164,174,.3); }
+#toastBox { position:fixed; bottom:16px; left:16px; z-index:999; display:flex; flex-direction:column; gap:8px; max-width:320px; }
+.toast { padding:11px 13px; border-radius:12px; background:rgba(10,20,51,.96); border:1px solid var(--border); border-right:3px solid var(--accent); font-size:11px; line-height:1.6; box-shadow:0 10px 30px rgba(0,0,0,.5); animation:toastIn .25s ease-out; }
+.toast.success { border-right-color:#00e676; }
+.toast.warning { border-right-color:#ffca28; }
+.toast.error { border-right-color:#ff5252; }
+@keyframes toastIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
 @media (max-width:760px) { .ai-layout { grid-template-columns:1fr; } .ai-panel { margin:0 10px 12px; padding:12px; } .file-grid { grid-template-columns:1fr; } }
 .empty { text-align:center; padding:60px 20px; color:var(--muted); }
 .empty .icon { font-size:48px; margin-bottom:12px; animation:float 3s ease-in-out infinite; }
@@ -127,21 +151,40 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
   <div class="ai-panel-head">
     <div>
       <div class="ai-panel-title" id="ai-panel-title">🎮 ميزات AI</div>
-      <div class="ai-panel-subtitle">خادم الرصد: pes22-game.cs.konami.net • التفضيلات محفوظة في data/features.json</div>
+      <div class="ai-panel-subtitle">خادم الرصد: pes22-game.cs.konami.net • التفضيلات محفوظة في data/features.json • لكل ميزة هدف (عليك/الخصم) وتوقيت (بدري/متأخر)</div>
     </div>
-    <span class="badge badge-purple">AI Analyzer v5.1</span>
+    <span class="badge badge-purple">AI Engine v5.2</span>
   </div>
-  <div class="ai-notice">⚠️ وضع واقعي وآمن للاتصال: داخل CONNECT نرى TLS ciphertext فقط. يحلل النظام الحجم وEntropy ويحفظ اختياراتك، لكنه لا يغيّر البايتات المشفرة لأن ذلك يفشل تحقق TLS ويقطع اللعبة.</div>
+  <div class="ai-notice">⚠️ الحقيقة التقنية: اتصال اللعبة TLS 1.3 مشفر، وميزات <b>التعديل</b> (إبطاء AI، ستامينا، تسديد يخطئ...) لا يمكن تطبيقها على ciphertext — تعديل أي بايت يفشل تحقق AEAD ويقطع المباراة. هذه الميزات تُحفظ وتُحلل وتُطبَّق على عينات Offline فقط، وتظهر حالتها بوضوح بالأسفل. أما ميزات <b>الرصد</b> (تنبيه البداية/النهاية، متابعة المباراة، البينغ) فتعمل فعلاً على الميتاداتا.</div>
+  <div class="match-bar">
+    <span class="match-phase" id="matchPhase">{{ match.phase_label if match else 'لا مباراة بعد' }}</span>
+    <span class="match-chip" id="matchPhaseSince">—</span>
+    <span class="match-chip" id="matchConnCount">{{ match.connections if match else 0 }} اتصالات</span>
+    <span class="match-chip" id="matchBytes">{{ match.server_bytes if match else 0 }}B ⬇ / {{ match.client_bytes if match else 0 }}B ⬆</span>
+    <span class="match-chip">تقدير من شكل الترافيك — ليس قراءة بروتوكول</span>
+    <div class="match-timeline" id="matchTimeline"></div>
+  </div>
   <div class="ai-layout">
     <div>
       <div class="ai-feature-grid" id="aiFeatureGrid">
         {% for key, feature in ai_features.items() %}
         <label class="ai-feature" for="feature-{{ key }}">
-          <input class="ai-checkbox" type="checkbox" id="feature-{{ key }}" data-feature="{{ key }}" {% if enabled_features.get(key) %}checked{% endif %}>
           <span class="ai-feature-icon">{{ feature.icon }}</span>
-          <span>
-            <span class="ai-feature-name">{{ feature.name }}</span>
+          <span style="flex:1;min-width:0;">
+            <span class="ai-feature-name">{{ feature.name }} <input class="ai-checkbox" type="checkbox" id="feature-{{ key }}" data-feature="{{ key }}" {% if enabled_features.get(key) %}checked{% endif %}></span>
             <span class="ai-feature-desc">{{ feature.desc }}</span>
+            <span class="feature-opts">
+              <select class="ai-target" data-feature="{{ key }}" title="على من تُطبَّق الميزة" onclick="event.stopPropagation()" onchange="event.stopPropagation()">
+                {% for tkey, tlabel in targets_def.items() %}
+                <option value="{{ tkey }}" {% if prefs.targets.get(key, feature.target) == tkey %}selected{% endif %}>الهدف: {{ tlabel }}</option>
+                {% endfor %}
+              </select>
+              <select class="ai-timing" data-feature="{{ key }}" title="متى تُفعَّل الميزة" onclick="event.stopPropagation()" onchange="event.stopPropagation()">
+                {% for tkey, tlabel in timings_def.items() %}
+                <option value="{{ tkey }}" {% if prefs.timings.get(key, feature.timing) == tkey %}selected{% endif %}>التوقيت: {{ tlabel }}</option>
+                {% endfor %}
+              </select>
+            </span>
           </span>
           <span class="ai-risk">{{ feature.risk }}</span>
         </label>
@@ -151,6 +194,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
         <button class="btn btn-success" id="saveFeaturesBtn" onclick="saveAIFeatures()">💾 حفظ الميزات</button>
         <span class="ai-save-status" id="aiSaveStatus">جاهز</span>
       </div>
+      <div class="ai-status-list" id="aiStatusList"></div>
     </div>
     <div class="ai-notifications">
       <h4>🔔 إشعارات AI المباشرة</h4>
@@ -160,12 +204,13 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
           <div class="ai-notification {{ item.level }}"><div>{{ item.msg }}</div><div class="ai-notification-time">{{ item.time }}</div></div>
           {% endfor %}
         {% else %}
-          <div style="color:var(--muted);font-size:10px;">لا إشعارات بعد — ستظهر عند رصد اتصال AI أو حفظ التفضيلات.</div>
+          <div style="color:var(--muted);font-size:10px;">لا إشعارات بعد — ستظهر لحظة رصد اتصال AI أو حفظ التفضيلات أو تغيّر طور المباراة.</div>
         {% endif %}
       </div>
     </div>
   </div>
 </section>
+<div id="toastBox"></div>
 <div class="controls">
   <input id="search" placeholder="🔍 بحث في Host..." oninput="filterLogs()">
   <select id="catFilter" onchange="filterLogs()"><option value="all">كل التصنيفات</option><option value="api">api</option><option value="auth">auth</option><option value="shop">shop</option><option value="match">match</option><option value="cdn">cdn</option></select>
@@ -248,6 +293,8 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 <script>
 let auto=true, timer=setInterval(fetchAll,2500), currentTab='all', ws=null;
 const dashboardToken = new URLSearchParams(location.search).get('token') || '';
+const STATUS_LABELS = {disabled:'معطّلة', active:'نشطة (رصد يعمل)', wait_timing:'مؤجلة — بانتظار التوقيت', applied:'طُبّقت', blocked_tls:'محجوبة — TLS مشفر', blocked_opponent:'محجوبة — الخصم خارج جهازك', ui_only:'واجهة فقط'};
+let seenNotifs = new Set([{% for item in notifications %}'{{ item.id }}',{% endfor %}]);
 function apiUrl(path){
   const url = new URL(path, location.origin);
   if(dashboardToken) url.searchParams.set('token', dashboardToken);
@@ -267,7 +314,7 @@ function connectWS(){
     ws = new WebSocket(proto+'//'+location.host+'/ws/live');
     ws.onopen = ()=> document.getElementById('wsStatus').textContent='● Live';
     ws.onclose = ()=> { document.getElementById('wsStatus').textContent='○ Polling'; setTimeout(connectWS,3000); };
-    ws.onmessage = (e)=>{ try{ const j=JSON.parse(e.data); if(j.type==='update'){ updateStats(j.stats); if(currentTab==='all') renderLogs(j.logs); } }catch{} };
+    ws.onmessage = (e)=>{ try{ const j=JSON.parse(e.data); if(j.type==='update'){ updateStats(j.stats); if(currentTab==='all') renderLogs(j.logs); if(j.notifications) handleNotifications(j.notifications); if(j.match) renderMatchPhase(j.match); } }catch{} };
   }catch{ document.getElementById('wsStatus').textContent='○ Polling'; }
 }
 connectWS();
@@ -281,12 +328,15 @@ function switchTab(t){
 }
 async function fetchAll(){
   try{
-    const [a,b,n] = await Promise.all([
+    const [a,b,n,m] = await Promise.all([
       apiFetch('/api/logs?limit=50').then(r=>r.json()),
       apiFetch('/api/files').then(r=>r.json()),
-      apiFetch('/api/notifications').then(r=>r.json())
+      apiFetch('/api/notifications').then(r=>r.json()),
+      apiFetch('/api/match').then(r=>r.json())
     ]);
-    updateStats(a.stats); renderAnalytics(); renderNotifications(n.notifications || []);
+    updateStats(a.stats); renderAnalytics(); handleNotifications(n.notifications || []);
+    if(m && m.match) renderMatchPhase(m.match);
+    if(m && m.statuses) renderFeatureStatuses(m.statuses);
     if(currentTab==='all') renderLogs(a.logs);
     if(currentTab==='files') renderFiles(b.files);
     if(currentTab==='grouped') renderGrouped(b.grouped);
@@ -320,6 +370,16 @@ async function loadAIFeatures(){
     document.querySelectorAll('.ai-checkbox').forEach(input=>{
       input.checked = data.state?.[input.dataset.feature] === true;
     });
+    document.querySelectorAll('.ai-target').forEach(sel=>{
+      const v = data.targets?.[sel.dataset.feature];
+      if(v) sel.value = v;
+    });
+    document.querySelectorAll('.ai-timing').forEach(sel=>{
+      const v = data.timings?.[sel.dataset.feature];
+      if(v) sel.value = v;
+    });
+    if(data.phase) renderMatchPhase(data.phase);
+    if(data.statuses) renderFeatureStatuses(data.statuses);
   }catch(error){
     document.getElementById('aiSaveStatus').textContent = error.message || 'تعذر تحميل الميزات';
   }
@@ -327,19 +387,22 @@ async function loadAIFeatures(){
 async function saveAIFeatures(){
   const button = document.getElementById('saveFeaturesBtn');
   const status = document.getElementById('aiSaveStatus');
-  const state = {};
+  const state = {}, targets = {}, timings = {};
   document.querySelectorAll('.ai-checkbox').forEach(input=>state[input.dataset.feature]=input.checked);
+  document.querySelectorAll('.ai-target').forEach(sel=>targets[sel.dataset.feature]=sel.value);
+  document.querySelectorAll('.ai-timing').forEach(sel=>timings[sel.dataset.feature]=sel.value);
   button.disabled = true;
   status.textContent = 'جارٍ الحفظ...';
   try{
     const response = await apiFetch('/api/features', {
       method:'POST',
       headers:{'content-type':'application/json'},
-      body:JSON.stringify({features:state})
+      body:JSON.stringify({features:state, targets, timings})
     });
     const data = await response.json();
     if(!response.ok) throw new Error(typeof data.detail==='string' ? data.detail : 'فشل حفظ الميزات');
-    status.textContent = '✓ حُفظت التفضيلات — TLS ما زال passthrough';
+    status.textContent = '✓ حُفظت التفضيلات';
+    if(data.statuses) renderFeatureStatuses(data.statuses);
     await refreshNotifications();
   }catch(error){
     status.textContent = '✕ ' + (error.message || 'فشل الحفظ');
@@ -350,16 +413,51 @@ async function saveAIFeatures(){
 async function refreshNotifications(){
   try{
     const data = await apiFetch('/api/notifications').then(r=>r.json());
-    renderNotifications(data.notifications || []);
+    handleNotifications(data.notifications || []);
   }catch{}
 }
-function renderNotifications(items){
+function handleNotifications(items){
   const container = document.getElementById('aiNotifications');
   if(!items.length){
-    container.innerHTML='<div style="color:var(--muted);font-size:10px;">لا إشعارات بعد — ستظهر عند رصد اتصال AI أو حفظ التفضيلات.</div>';
+    container.innerHTML='<div style="color:var(--muted);font-size:10px;">لا إشعارات بعد — ستظهر لحظة رصد اتصال AI أو حفظ التفضيلات أو تغيّر طور المباراة.</div>';
     return;
   }
   container.innerHTML=items.map(item=>`<div class="ai-notification ${escapeHTML(item.level)}"><div>${escapeHTML(item.msg)}</div><div class="ai-notification-time">${escapeHTML(item.time)}</div></div>`).join('');
+  const fresh = items.filter(item=>!seenNotifs.has(item.id));
+  fresh.forEach(item=>{ seenNotifs.add(item.id); showToast(item); });
+  if(seenNotifs.size>200) seenNotifs = new Set(items.map(i=>i.id));
+}
+function showToast(item){
+  const box = document.getElementById('toastBox');
+  const t = document.createElement('div');
+  const icon = item.level==='success'?'✅':item.level==='warning'?'⚠️':'🔔';
+  t.className = 'toast ' + (['success','warning','error'].includes(item.level) ? item.level : '');
+  t.innerHTML = `<div><b>${icon}</b> ${escapeHTML(item.msg)}</div><div style="color:var(--muted);font-size:9px;margin-top:3px;">${escapeHTML(item.time||'')}</div>`;
+  box.appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .4s'; setTimeout(()=>t.remove(),400); }, 6000);
+}
+function renderFeatureStatuses(statuses){
+  const c = document.getElementById('aiStatusList');
+  if(!statuses || !statuses.length){ c.innerHTML=''; return; }
+  const rows = statuses.map(s=>{
+    const label = STATUS_LABELS[s.status] || s.status;
+    return `<div class="ai-status-row">
+      <span class="st-icon">${escapeHTML(s.icon)}</span>
+      <span class="st-name">${escapeHTML(s.name)}</span>
+      <span class="st-chip st-${escapeHTML(s.status)}">${escapeHTML(label)}</span>
+      <span class="st-why">${escapeHTML(s.reason||'')}</span>
+    </div>`;
+  }).join('');
+  c.innerHTML = `<h4 style="color:var(--accent);font-size:11px;margin-bottom:4px;">📋 حالة كل ميزة (حسب آخر اتصال AI والطور الحالي)</h4>${rows}`;
+}
+function renderMatchPhase(match){
+  if(!match) return;
+  const el = id=>document.getElementById(id);
+  el('matchPhase').textContent = match.phase_label || match.phase || '—';
+  el('matchPhaseSince').textContent = match.phase_since ? 'منذ ' + new Date(match.phase_since*1000).toLocaleTimeString('ar-DZ') : '—';
+  el('matchConnCount').textContent = (match.connections||0) + ' اتصالات';
+  el('matchBytes').textContent = (match.server_bytes||0) + 'B ⬇ / ' + (match.client_bytes||0) + 'B ⬆';
+  el('matchTimeline').innerHTML = (match.timeline||[]).map(e=>`<span>⚽ ${escapeHTML(e.label)} • ${new Date(e.timestamp*1000).toLocaleTimeString('ar-DZ')}</span>`).join('');
 }
 function renderLogs(logs){
   const c=document.getElementById('logs');

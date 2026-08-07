@@ -11,7 +11,24 @@ from .logger import store
 from .advanced import analyze_payload_metadata, protection_headers
 from .max_decrypt import max_analyze, protection_max
 from .ai_analyzer import AIConnectionAnalyzer
-from .features import add_notification, get_enabled, is_ai_host
+from .features import (
+    add_notification,
+    feature_statuses,
+    get_enabled,
+    is_ai_host,
+    set_last_analysis,
+)
+from .match_tracker import tracker
+
+def _notify_match_events(events):
+    """حوّل أحداث أطوار المباراة إلى إشعارات واضحة."""
+    for event in events:
+        add_notification(
+            f"⚽ تقدير المباراة: {event['label']}",
+            level="warning",
+            category="phase",
+            phase=event["phase"],
+        )
 
 async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     peer = writer.get_extra_info("peername")
@@ -90,6 +107,7 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                 enabled_features,
                 encrypted_tunnel=True,
             )
+            _notify_match_events(tracker.connection_start(host))
             add_notification(
                 "تم رصد اتصال خادم AI — تحليل TLS metadata بدون تعديل البايتات",
                 level="warning" if enabled_features else "info",
@@ -115,6 +133,7 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                             total_relay += len(chunk)
                             if ai_tracker is not None:
                                 chunk = ai_tracker.process(chunk, direction)
+                                _notify_match_events(tracker.chunk(direction, len(chunk)))
                             w.write(chunk)
                             await w.drain()
                     except:
@@ -129,6 +148,21 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                     relay_count(remote_reader, writer, "server_to_client"),
                 )
                 ai_analysis = ai_tracker.result() if ai_tracker is not None else None
+                if ai_tracker is not None:
+                    _notify_match_events(tracker.connection_end(host))
+                    set_last_analysis(ai_analysis)
+                    statuses = feature_statuses(ai_analysis, tracker.snapshot()["phase"])
+                    enabled_statuses = [s for s in statuses if s["enabled"]]
+                    if enabled_statuses:
+                        blocked = sum(1 for s in enabled_statuses if s["status"] in ("blocked_tls", "blocked_opponent", "ui_only"))
+                        active = sum(1 for s in enabled_statuses if s["status"] in ("active", "applied"))
+                        waiting = sum(1 for s in enabled_statuses if s["status"] == "wait_timing")
+                        add_notification(
+                            f"📋 تقرير ميزات AI: {active} نشطة/مطبّقة • {waiting} بانتظار التوقيت • {blocked} محجوبة (TLS/الخصم)",
+                            level="warning" if blocked else "success",
+                            host=host,
+                            statuses=[{s["key"]: s["status"]} for s in enabled_statuses],
+                        )
                 duration_ms = int((time.time() - start) * 1000)
                 if should_log:
                     adv = analyze_payload_metadata(total_relay or len(data), duration_ms, tls_info["tls_version"] if tls_info else "TLSv1.3")
