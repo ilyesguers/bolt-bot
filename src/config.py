@@ -1,16 +1,13 @@
 """
-إعدادات المشروع - eFootball Traffic Analyzer
-تكلفة $0 - Railway + iPhone 13
-التحديث: 2026-08-07 - Africa/Algiers
-الإصدار: v4.2 Maximum Real Decrypt
+eFootball Traffic Analyzer - Final Edition
+2026-08-07 - Africa/Algiers - iPhone 13 + Railway $0
+v5.0 Final - 1000x Better - Beautiful & Integrated
 """
 import os
-from datetime import datetime
 
 TODAY = "2026-08-07"
-VERSION = "4.2.0"
-VERSION_NAME = "Maximum Real Decrypt"
-
+VERSION = "5.0.0"
+VERSION_NAME = "Final Beautiful Integrated"
 TIMEZONE = "Africa/Algiers"
 PORT = int(os.environ.get("PORT", "8080"))
 LOG_LIMIT = int(os.environ.get("LOG_LIMIT", "800"))
@@ -21,7 +18,7 @@ EFOOTBALL_KEYWORDS = ["konami","pes","efootball","e-football"]
 FETCH_CERT_INFO = True
 CERT_TIMEOUT = 3
 MODERN_DECRYPT = True
-DECRYPT_MODE = "maximum"  # maximum real without breaking
+DECRYPT_MODE = "maximum"
 PERSISTENT_STORAGE = True
 DATA_DIR = os.environ.get("DATA_DIR", "data")
 ANALYTICS_ENABLED = True
@@ -58,12 +55,10 @@ def get_host_category(host: str) -> str:
         return "other"
 
 BANNER = f"""
-╔════════════════════════════════════════════════╗
-║  eFootball Traffic Analyzer v{VERSION}        ║
-║  {VERSION_NAME}                              ║
-║  Date: {TODAY} | {TIMEZONE}                  ║
-║  Mode: MAXIMUM Real Decrypt + Stealth MAX    ║
-║  Read: SNI/Cert/Size/Entropy/Timing 92%      ║
-║  Port: {PORT} | Logs: {LOG_LIMIT}           ║
-╚════════════════════════════════════════════════╝
+╔════════════════════════════════════════════════════╗
+║  eFootball Traffic Analyzer v{VERSION} Final      ║
+║  {VERSION_NAME} - 1000x Better                   ║
+║  {TODAY} | {TIMEZONE} | iPhone 13 | Railway $0  ║
+║  Maximum Decrypt + Stealth MAX + Beautiful      ║
+╚════════════════════════════════════════════════════╝
 """

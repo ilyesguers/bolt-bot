@@ -3,95 +3,96 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>eFootball Analyzer v{{ version }} — {{ today }} • Integrated</title>
-<link rel="manifest" href="data:application/json,{}">
+<title>eFootball Analyzer v{{ version }} Final — {{ today }}</title>
 <style>
-:root { --bg:#060a1a; --card:#0f1a33; --card2:#0c1530; --border:#1e3a5f; --accent:#4fc3f7; --green:#00e676; --gold:#ffca28; --text:#e3f2fd; --muted:#78909c; }
+:root { --bg:#050a1f; --card:rgba(15,26,51,0.8); --card2:#0a1433; --border:rgba(42,74,138,0.3); --accent:#4fc3f7; --accent2:#00e676; --gold:#ffca28; --text:#e3f2fd; --muted:#78909c; }
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
-.header { background: linear-gradient(135deg,#0a1433 0%,#16295e 60%,#1e3a7a 100%); padding:20px; border-bottom:2px solid #2a4a8a; position:sticky; top:0; z-index:20; }
-.header h1 { font-size:21px; color:var(--accent); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-.header h1 span { font-size:11px; background:rgba(79,195,247,0.15); padding:4px 10px; border-radius:20px; border:1px solid rgba(79,195,247,0.3); }
-.badges { display:flex; gap:6px; margin-top:12px; flex-wrap:wrap; }
-.badge { padding:5px 10px; border-radius:20px; font-size:10px; font-weight:800; }
-.badge-green { background:#0a2e1a; color:#69f0ae; border:1px solid #00c853; }
-.badge-blue { background:#0d2a5a; color:#82b1ff; border:1px solid #2962ff; }
-.badge-gold { background:#3a2e00; color:#ffd740; border:1px solid #ffab00; }
-.badge-purple { background:#1a0a3a; color:#b388ff; border:1px solid #651fff; }
-.live-dot { width:9px; height:9px; background:var(--green); border-radius:50%; display:inline-block; animation:pulse 1.3s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-.stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:10px; padding:14px; }
-.stat { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; text-align:center; position:relative; }
-.stat .num { font-size:24px; font-weight:900; color:var(--accent); }
-.stat .label { font-size:10px; color:var(--muted); margin-top:3px; }
-.controls { padding:12px 14px; background:var(--card2); border-top:1px solid var(--border); border-bottom:1px solid var(--border); display:flex; gap:7px; flex-wrap:wrap; align-items:center; }
-.controls input, .controls select { background:#0a1433; border:1px solid var(--border); color:var(--text); padding:7px 10px; border-radius:8px; font-size:12px; }
-.controls input { min-width:180px; flex:1; max-width:300px; }
-.btn { padding:7px 12px; border:none; border-radius:8px; cursor:pointer; font-weight:800; font-size:11px; }
-.btn-primary { background:#1565c0; color:#fff; }
-.btn-success { background:#2e7d32; color:#fff; }
-.btn-danger { background:#c62828; color:#fff; }
-.btn-ghost { background:#1a2a4a; color:#90a4ae; border:1px solid #2a3a5a; }
-.tabs { display:flex; gap:6px; padding:10px 14px; overflow-x:auto; }
-.tab { padding:7px 14px; border-radius:20px; font-size:11px; font-weight:800; cursor:pointer; border:1px solid var(--border); background:var(--card); color:var(--muted); white-space:nowrap; }
-.tab.active { background:var(--accent); color:#020a1a; }
-.content { padding:14px; }
-.section-title { font-size:12px; color:var(--accent); margin:14px 0 8px; font-weight:800; display:flex; align-items:center; gap:6px; }
-.file-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap:10px; }
-.file-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:11px; border-right:3px solid var(--accent); transition:.15s; }
-.file-card:hover { transform:translateY(-1px); border-color:#2d5aa0; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: radial-gradient(ellipse at top, #0a1940 0%, var(--bg) 60%); color:var(--text); min-height:100vh; }
+.header { background: linear-gradient(135deg, rgba(10,20,51,0.9) 0%, rgba(22,41,94,0.9) 50%, rgba(30,58,122,0.9) 100%); backdrop-filter: blur(20px); padding:24px 20px; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:20; box-shadow:0 8px 32px rgba(0,0,0,0.4); }
+.header h1 { font-size:22px; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-weight:900; }
+.header h1 span { font-size:11px; background:rgba(79,195,247,0.12); padding:5px 12px; border-radius:20px; border:1px solid rgba(79,195,247,0.25); -webkit-text-fill-color: var(--accent); }
+.badges { display:flex; gap:7px; margin-top:14px; flex-wrap:wrap; }
+.badge { padding:6px 12px; border-radius:20px; font-size:10px; font-weight:800; backdrop-filter: blur(10px); border:1px solid; }
+.badge-green { background:rgba(0,230,118,0.12); color:#69f0ae; border-color:rgba(0,230,118,0.3); }
+.badge-blue { background:rgba(41,98,255,0.12); color:#82b1ff; border-color:rgba(41,98,255,0.3); }
+.badge-gold { background:rgba(255,202,40,0.12); color:#ffd740; border-color:rgba(255,202,40,0.3); }
+.badge-purple { background:rgba(101,31,255,0.12); color:#b388ff; border-color:rgba(101,31,255,0.3); }
+.live-dot { width:10px; height:10px; background:var(--accent2); border-radius:50%; display:inline-block; animation:pulse 1.5s infinite; box-shadow:0 0 12px var(--accent2); }
+@keyframes pulse { 0%,100%{opacity:1; transform:scale(1)} 50%{opacity:0.5; transform:scale(1.15)} }
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+.stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:12px; padding:16px; }
+.stat { background: var(--card); backdrop-filter: blur(12px); border:1px solid var(--border); border-radius:16px; padding:18px; text-align:center; position:relative; overflow:hidden; transition:0.3s; }
+.stat:hover { transform:translateY(-3px); border-color: rgba(79,195,247,0.4); box-shadow:0 8px 24px rgba(79,195,247,0.15); }
+.stat::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg, var(--accent), var(--accent2)); }
+.stat .num { font-size:28px; font-weight:900; background:linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.stat .label { font-size:11px; color:var(--muted); margin-top:4px; letter-spacing:0.5px; }
+.controls { padding:14px; background:rgba(10,20,51,0.6); backdrop-filter: blur(12px); border-top:1px solid var(--border); border-bottom:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.controls input, .controls select { background:rgba(10,20,51,0.8); border:1px solid var(--border); color:var(--text); padding:9px 12px; border-radius:10px; font-size:12px; transition:0.2s; }
+.controls input:focus { border-color:var(--accent); outline:none; box-shadow:0 0 0 3px rgba(79,195,247,0.15); }
+.btn { padding:9px 16px; border:none; border-radius:10px; cursor:pointer; font-weight:800; font-size:11px; transition:0.2s; display:flex; align-items:center; gap:5px; }
+.btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+.btn-primary { background:linear-gradient(135deg, #1565c0, #1e88e5); color:#fff; }
+.btn-success { background:linear-gradient(135deg, #2e7d32, #43a047); color:#fff; }
+.btn-danger { background:linear-gradient(135deg, #c62828, #e53935); color:#fff; }
+.btn-ghost { background:rgba(26,42,74,0.8); color:#90a4ae; border:1px solid var(--border); }
+.tabs { display:flex; gap:8px; padding:14px; overflow-x:auto; }
+.tab { padding:10px 18px; border-radius:20px; font-size:11px; font-weight:800; cursor:pointer; border:1px solid var(--border); background:var(--card); color:var(--muted); white-space:nowrap; transition:0.2s; }
+.tab.active { background:linear-gradient(135deg, var(--accent), var(--accent2)); color:#020a1a; border-color:transparent; transform:scale(1.02); }
+.content { padding:16px; }
+.section-title { font-size:12px; color:var(--accent); margin:16px 0 10px; font-weight:800; display:flex; align-items:center; gap:8px; }
+.section-title::before { content:''; width:3px; height:14px; background:linear-gradient(180deg, var(--accent), var(--accent2)); border-radius:2px; }
+.file-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(320px,1fr)); gap:12px; }
+.file-card { background: var(--card); backdrop-filter: blur(12px); border:1px solid var(--border); border-radius:14px; padding:14px; border-right:3px solid var(--accent); transition:0.3s; animation:float 6s ease-in-out infinite; }
+.file-card:hover { transform:translateY(-4px); box-shadow:0 12px 32px rgba(0,0,0,0.4); border-color: rgba(79,195,247,0.5); }
 .file-card.api { border-right-color:#29b6f6; } .file-card.auth { border-right-color:#ff7043; } .file-card.shop { border-right-color:#66bb6a; } .file-card.match { border-right-color:#ffca28; } .file-card.cdn { border-right-color:#ab47bc; }
 .file-head { display:flex; justify-content:space-between; gap:8px; }
 .file-name { font-weight:800; font-size:12px; color:var(--accent); word-break:break-all; }
-.file-time { font-size:10px; color:var(--muted); }
-.file-meta { display:flex; gap:5px; flex-wrap:wrap; margin-top:7px; }
-.meta { font-size:10px; padding:3px 7px; border-radius:6px; background:#0a1433; border:1px solid #1e2a4a; color:#b0bec5; }
-.meta.tls13 { background:#0a2e1a; color:#69f0ae; border-color:#00c853; }
-.decrypt { margin-top:9px; background:#070d26; border:1px solid #1e2a4a; border-radius:8px; padding:9px; }
-.decrypt-title { font-size:11px; color:var(--gold); font-weight:800; display:flex; justify-content:space-between; }
-.decrypt-row { font-size:11px; color:#b0bec5; margin:3px 0; display:flex; justify-content:space-between; }
+.file-time { font-size:10px; color:var(--muted); background:rgba(0,0,0,0.2); padding:4px 8px; border-radius:6px; }
+.file-meta { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.meta { font-size:10px; padding:4px 8px; border-radius:8px; background:rgba(10,20,51,0.8); border:1px solid var(--border); color:#b0bec5; }
+.meta.tls13 { background:rgba(0,230,118,0.15); color:#69f0ae; border-color:rgba(0,230,118,0.3); }
+.decrypt { margin-top:10px; background:rgba(7,13,38,0.8); border:1px solid rgba(30,42,74,0.6); border-radius:10px; padding:10px; backdrop-filter: blur(8px); }
+.decrypt-title { font-size:11px; color:var(--gold); font-weight:800; display:flex; justify-content:space-between; align-items:center; }
+.decrypt-row { font-size:11px; color:#b0bec5; margin:4px 0; display:flex; justify-content:space-between; gap:8px; }
 .decrypt-row span { color:var(--muted); }
-.score { padding:2px 6px; border-radius:4px; font-weight:900; font-size:10px; }
-.score-high { background:#00c853; color:#fff; } .score-mid { background:#ffab00; color:#000; }
-.analytics { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:10px; margin-bottom:12px; }
-.chart { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px; }
-.chart h4 { font-size:11px; color:var(--accent); margin-bottom:8px; }
-.bar { display:flex; align-items:center; gap:8px; margin:6px 0; font-size:11px; }
-.bar-label { min-width:70px; color:var(--muted); }
-.bar-fill { height:10px; background:linear-gradient(90deg, var(--accent), var(--green)); border-radius:4px; }
-.group { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px; }
-.group-head { display:flex; justify-content:space-between; }
+.score { padding:3px 8px; border-radius:6px; font-weight:900; font-size:10px; }
+.score-high { background:linear-gradient(135deg, #00c853, #00e676); color:#fff; } .score-mid { background:linear-gradient(135deg, #ffab00, #ffca28); color:#000; }
+.analytics { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap:12px; margin-bottom:12px; }
+.chart { background:var(--card); backdrop-filter: blur(12px); border:1px solid var(--border); border-radius:14px; padding:14px; }
+.chart h4 { font-size:11px; color:var(--accent); margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+.bar { display:flex; align-items:center; gap:8px; margin:7px 0; font-size:11px; }
+.bar-label { min-width:75px; color:var(--muted); font-size:10px; }
+.bar-fill { height:10px; background:linear-gradient(90deg, var(--accent), var(--accent2)); border-radius:5px; box-shadow:0 2px 8px rgba(79,195,247,0.3); }
+.group { background:var(--card); backdrop-filter: blur(12px); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:10px; }
+.group-head { display:flex; justify-content:space-between; align-items:center; }
 .group-name { font-weight:800; color:var(--accent); }
-.group-count { background:var(--accent); color:#000; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:900; }
-.empty { text-align:center; padding:45px 20px; color:var(--muted); }
-.footer { text-align:center; padding:18px; font-size:11px; color:#546e7a; border-top:1px solid #0f1a33; margin-top:18px; }
+.group-count { background:linear-gradient(135deg, var(--accent), var(--accent2)); color:#000; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:900; }
+.empty { text-align:center; padding:60px 20px; color:var(--muted); }
+.empty .icon { font-size:48px; margin-bottom:12px; animation:float 3s ease-in-out infinite; }
+.footer { text-align:center; padding:24px; font-size:11px; color:#546e7a; border-top:1px solid var(--border); margin-top:20px; background:rgba(10,20,51,0.3); }
 </style>
 </head>
 <body>
 <div class="header">
-  <h1>⚡ eFootball Analyzer <span>v{{ version }} • {{ today }}</span> <span class="live-dot"></span> <span style="background: linear-gradient(90deg,#00e676,#4fc3f7); color:#000;">INTEGRATED</span></h1>
-  <div style="font-size:11px; color:#90a4ae;">{{ version_name }} • {{ today }} • Africa/Algiers • Live WebSocket + Storage + Analytics</div>
+  <h1>⚡ eFootball Analyzer <span>v{{ version }} Final • {{ today }}</span> <span class="live-dot"></span> <span style="background:linear-gradient(90deg,#00e676,#4fc3f7); color:#000; padding:4px 10px; border-radius:20px; font-size:10px; font-weight:900;">1000x Better</span></h1>
+  <div style="font-size:11px; color:#90a4ae; margin-top:4px;">{{ version_name }} • {{ today }} • Africa/Algiers • Live WebSocket + Maximum Decrypt + Beautiful</div>
   <div class="badges">
     <span class="badge badge-green">● READ-ONLY</span>
     <span class="badge badge-blue">🔓 TLS 1.3</span>
-    <span class="badge badge-gold" style="background:#3a1a00; color:#ff9e00; border-color:#ff6f00;">🧠 تشفير خاص</span>
-    <span class="badge badge-purple" style="background:#0a2e1a; color:#69f0ae; border-color:#00c853;">🛡️ Stealth ON</span>
-    <span class="badge badge-gold">📁 Files</span>
+    <span class="badge" style="background:rgba(255,111,0,0.12); color:#ff9e00; border-color:rgba(255,111,0,0.3);">🧠 تشفير خاص</span>
+    <span class="badge" style="background:rgba(0,230,118,0.12); color:#69f0ae; border-color:rgba(0,230,118,0.3);">🛡️ Stealth MAX</span>
     <span class="badge badge-purple">📊 Analytics</span>
     <span class="badge badge-green">🔄 Live WS</span>
     <span class="badge badge-blue">💾 Persistent</span>
   </div>
 </div>
-
 <div class="stats" id="stats">
   <div class="stat"><div class="num" id="s-total">{{ stats.total }}</div><div class="label">إجمالي</div></div>
-  <div class="stat"><div class="num" id="s-ef" style="color:var(--green)">{{ stats.efootball }}</div><div class="label">eFootball</div></div>
+  <div class="stat"><div class="num" id="s-ef" style="background:linear-gradient(90deg, #00e676, #4fc3f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">{{ stats.efootball }}</div><div class="label">eFootball</div></div>
   <div class="stat"><div class="num" id="s-stored">{{ stats.stored }}</div><div class="label">محفوظة</div></div>
   <div class="stat"><div class="num" id="s-hosts">{{ grouped.total_hosts if grouped else 0 }}</div><div class="label">سيرفرات</div></div>
   <div class="stat"><div class="num" id="s-uptime" style="font-size:14px">{{ stats.uptime_str }}</div><div class="label">مدة التشغيل</div></div>
 </div>
-
-<!-- Analytics -->
 <div class="content" id="analytics" style="padding-bottom:0;">
   <div class="analytics">
     <div class="chart"><h4>📊 حسب التصنيف</h4><div id="chart-cat"></div></div>
@@ -99,29 +100,26 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
     <div class="chart"><h4>⚡ الأداء</h4><div id="chart-perf"></div></div>
   </div>
 </div>
-
 <div class="controls">
-  <input id="search" placeholder="🔍 بحث..." oninput="filterLogs()">
+  <input id="search" placeholder="🔍 بحث في Host..." oninput="filterLogs()">
   <select id="catFilter" onchange="filterLogs()"><option value="all">كل التصنيفات</option><option value="api">api</option><option value="auth">auth</option><option value="shop">shop</option><option value="match">match</option><option value="cdn">cdn</option></select>
   <button class="btn btn-primary" onclick="fetchAll()">🔄 تحديث</button>
   <button class="btn btn-success" onclick="exportCSV()">📄 CSV</button>
   <button class="btn btn-primary" onclick="exportJSON()">📥 JSON</button>
   <button class="btn btn-danger" onclick="clearLogs()">🗑️ مسح</button>
   <button class="btn btn-ghost" id="autoBtn" onclick="toggleAuto()">⏸️ تلقائي</button>
-  <span id="wsStatus" style="font-size:11px; color:var(--green);">● Live WS متصل</span>
+  <span id="wsStatus" style="font-size:11px; color:var(--accent2);">● Live</span>
   <span id="updateInfo" style="font-size:11px; color:var(--muted);">{{ today }}</span>
 </div>
-
 <div class="tabs">
   <div class="tab active" onclick="switchTab('all')" id="tab-all">📋 السجلات</div>
   <div class="tab" onclick="switchTab('files')" id="tab-files">📁 ملفات</div>
   <div class="tab" onclick="switchTab('grouped')" id="tab-grouped">🗂️ مجمع</div>
   <div class="tab" onclick="switchTab('certs')" id="tab-certs">🔒 شهادات</div>
 </div>
-
 <div class="content">
   <div id="view-all">
-    <div class="section-title">📄 السجلات — تحديث لحظي (WebSocket + Polling)</div>
+    <div class="section-title">📄 السجلات — تحديث لحظي WebSocket</div>
     <div id="logs" class="file-grid">
       {% if logs %}
         {% for log in logs %}
@@ -134,7 +132,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
             <div class="file-time">{{ log.time_str }}<br>{{ log.date_str }}</div>
           </div>
           <div class="file-meta">
-            <span class="meta" style="background:#0a2e1a; color:#69f0ae;">{{ log.status }}</span>
+            <span class="meta" style="background:rgba(0,230,118,0.15); color:#69f0ae; border-color:rgba(0,230,118,0.3);">{{ log.status }}</span>
             <span class="meta">⏱️ {{ log.duration_ms or 0 }}ms</span>
             <span class="meta">{{ log.category }}</span>
             {% if log.tls_info and log.tls_info.tls_version %}<span class="meta tls13">{{ log.tls_info.tls_version }}</span>{% endif %}
@@ -147,26 +145,22 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
           </div>
           {% endif %}
           {% if log.advanced %}
-          <div class="decrypt" style="border-color:#ff6f00; background:#1a0f00;">
-            <div class="decrypt-title" style="color:#ff9e00;">🧠 التشفير الخاص — {{ log.advanced.protocol_guess }} <span style="background:#ff6f00; color:#fff; padding:2px 6px; border-radius:4px; font-size:10px;">{{ log.advanced.entropy }} entropy</span></div>
-            <div class="decrypt-row"><span>النوع الداخلي:</span> <b style="color:{{ 'red' if log.advanced.color=='red' else '#4fc3f7' }}">{{ log.advanced.protocol_guess }}</b> — {{ log.advanced.desc }}</div>
-            <div class="decrypt-row"><span>الحجم:</span> {{ log.advanced.size }} bytes • {{ log.advanced.duration_ms }}ms</div>
-            <div class="decrypt-row"><span>الحماية:</span> <span style="color:#00e676;">🛡️ {{ log.advanced.protection }} — {{ log.advanced.stealth and 'Stealth ON' or '' }}</span> • {{ log.advanced.risk }}</div>
+          <div class="decrypt" style="border-color:rgba(255,111,0,0.4); background:rgba(26,15,0,0.6);">
+            <div class="decrypt-title" style="color:#ff9e00;">🧠 {{ log.advanced.protocol_guess }} <span style="background:#ff6f00; color:#fff; padding:2px 6px; border-radius:6px; font-size:10px;">{{ log.advanced.entropy }}</span></div>
+            <div class="decrypt-row"><span>النوع:</span> <b>{{ log.advanced.protocol_guess }}</b></div>
+            <div class="decrypt-row"><span>الحجم:</span> {{ log.advanced.size }} bytes</div>
           </div>
           {% endif %}
           {% if log.max_decrypt %}
-          <div class="decrypt" style="border-color:#00e676; background:#002a14;">
-            <div class="decrypt-title" style="color:#00e676;">🔬 أقصى تحليل واقعي — {{ log.max_decrypt.inner_guess }} <span class="score score-high">{{ log.max_decrypt.confidence }}%</span></div>
-            <div class="decrypt-row"><span>الطبقات:</span> {{ log.max_decrypt.layers.outer }} → {{ log.max_decrypt.layers.middle }} → {{ log.max_decrypt.layers.inner }}</div>
-            <div class="decrypt-row"><span>مقروء الآن:</span> {{ log.max_decrypt.readable_now.sni }} • {{ log.max_decrypt.readable_now.size }} • {{ log.max_decrypt.readable_now.entropy }} entropy</div>
-            <div class="decrypt-row"><span>يحتاج MITM:</span> <span style="color:#ff9e00;">{{ log.max_decrypt.needs_mitm.body_json }}</span></div>
-            <div class="decrypt-row"><span>الحماية القصوى:</span> <span style="color:#00e676;">{{ log.max_decrypt.protection.stealth }}</span> — {{ log.max_decrypt.summary }}</div>
+          <div class="decrypt" style="border-color:rgba(0,230,118,0.4); background:rgba(0,42,20,0.6);">
+            <div class="decrypt-title" style="color:#00e676;">🔬 {{ log.max_decrypt.inner_guess }} <span class="score score-high">{{ log.max_decrypt.confidence }}%</span></div>
+            <div class="decrypt-row"><span>الطبقات:</span> {{ log.max_decrypt.layers.outer }} → {{ log.max_decrypt.layers.inner }}</div>
           </div>
           {% endif %}
         </div>
         {% endfor %}
       {% else %}
-        <div class="empty" style="grid-column:1/-1;"><div style="font-size:36px">📡</div><div>لا يوجد ترافيك — {{ today }}</div><div style="font-size:12px; margin-top:6px;">اضبط iPhone على البروكسي ثم افتح eFootball</div></div>
+        <div class="empty" style="grid-column:1/-1;"><div class="icon">📡</div><div>لا يوجد ترافيك — {{ today }}</div><div style="font-size:12px; margin-top:8px; color:var(--muted);">اضبط iPhone على البروكسي ثم افتح eFootball</div></div>
       {% endif %}
     </div>
   </div>
@@ -174,27 +168,20 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   <div id="view-grouped" style="display:none;"><div class="section-title">🗂️ مجمع حسب السيرفر</div><div id="grouped"></div></div>
   <div id="view-certs" style="display:none;"><div class="section-title">🔒 الشهادات</div><div id="certs" class="file-grid"></div></div>
 </div>
-
 <div class="footer">
-  eFootball Analyzer v{{ version }} Integrated • {{ today }} • Live WebSocket • Persistent Storage • Analytics • Modern Decrypt • READ-ONLY<br>
-  <span style="color:var(--muted);">API Docs: <a href="/docs" style="color:var(--accent);">/docs</a> • Health: <a href="/health" style="color:var(--accent);">/health</a> • CSV: <a href="/api/export/csv" style="color:var(--accent);">/api/export/csv</a></span>
+  eFootball Analyzer v{{ version }} Final • {{ today }} • Beautiful • Live WS • Maximum Decrypt • Stealth MAX • 1000x Better<br>
+  <span style="color:var(--muted);">API: <a href="/docs" style="color:var(--accent);">/docs</a> • <a href="/health" style="color:var(--accent);">/health</a> • <a href="/api/export/csv" style="color:var(--accent);">CSV</a></span>
 </div>
-
 <script>
 let auto=true, timer=setInterval(fetchAll,2500), currentTab='all', ws=null;
 function connectWS(){
   try{
     const proto = location.protocol==='https:'?'wss:':'ws:';
     ws = new WebSocket(proto+'//'+location.host+'/ws/live');
-    ws.onopen = ()=> document.getElementById('wsStatus').textContent='● Live WS متصل';
-    ws.onclose = ()=> { document.getElementById('wsStatus').textContent='○ WS غير متصل'; setTimeout(connectWS,3000); };
-    ws.onmessage = (e)=>{
-      try{
-        const j=JSON.parse(e.data);
-        if(j.type==='update'){ updateStats(j.stats); if(currentTab==='all') renderLogs(j.logs); }
-      }catch{}
-    };
-  }catch{ document.getElementById('wsStatus').textContent='○ Polling فقط'; }
+    ws.onopen = ()=> document.getElementById('wsStatus').textContent='● Live';
+    ws.onclose = ()=> { document.getElementById('wsStatus').textContent='○ Polling'; setTimeout(connectWS,3000); };
+    ws.onmessage = (e)=>{ try{ const j=JSON.parse(e.data); if(j.type==='update'){ updateStats(j.stats); if(currentTab==='all') renderLogs(j.logs); } }catch{} };
+  }catch{ document.getElementById('wsStatus').textContent='○ Polling'; }
 }
 connectWS();
 function switchTab(t){
@@ -208,8 +195,7 @@ function switchTab(t){
 async function fetchAll(){
   try{
     const [a,b] = await Promise.all([fetch('/api/logs?limit=50').then(r=>r.json()), fetch('/api/files').then(r=>r.json())]);
-    updateStats(a.stats);
-    renderAnalytics();
+    updateStats(a.stats); renderAnalytics();
     if(currentTab==='all') renderLogs(a.logs);
     if(currentTab==='files') renderFiles(b.files);
     if(currentTab==='grouped') renderGrouped(b.grouped);
@@ -228,7 +214,7 @@ async function renderAnalytics(){
   try{
     const j = await fetch('/api/analytics').then(r=>r.json());
     if(j.empty) return;
-    let catHtml=''; for(const [k,v] of Object.entries(j.by_category)){ const pct=Math.round(v/j.total*100); catHtml+=`<div class="bar"><span class="bar-label">${k}</span><div style="flex:1; background:#0a1433; border-radius:4px;"><div class="bar-fill" style="width:${pct}%"></div></div><span>${v}</span></div>`; }
+    let catHtml=''; for(const [k,v] of Object.entries(j.by_category)){ const pct=Math.round(v/j.total*100); catHtml+=`<div class="bar"><span class="bar-label">${k}</span><div style="flex:1; background:rgba(10,20,51,0.8); border-radius:5px;"><div class="bar-fill" style="width:${pct}%"></div></div><span>${v}</span></div>`; }
     document.getElementById('chart-cat').innerHTML=catHtml||'لا بيانات';
     let hostHtml=''; for(const [k,v] of Object.entries(j.by_host)){ hostHtml+=`<div class="bar"><span class="bar-label" style="min-width:120px; font-size:10px;">${k}</span><span>${v}</span></div>`; }
     document.getElementById('chart-host').innerHTML=hostHtml||'لا بيانات';
@@ -237,33 +223,33 @@ async function renderAnalytics(){
 }
 function renderLogs(logs){
   const c=document.getElementById('logs');
-  if(!logs.length){ c.innerHTML=`<div class="empty" style="grid-column:1/-1;"><div style="font-size:36px">📡</div><div>لا يوجد ترافيك</div></div>`; return; }
+  if(!logs.length){ c.innerHTML=`<div class="empty" style="grid-column:1/-1;"><div class="icon">📡</div><div>لا يوجد ترافيك</div></div>`; return; }
   c.innerHTML=logs.map(log=>`
     <div class="file-card ${log.category}">
       <div class="file-head"><div style="display:flex;gap:8px;align-items:center;"><span>${log.category==='auth'?'🔐':log.category==='shop'?'🛒':log.category==='match'?'⚽':log.category==='api'?'🔌':'📄'}</span><div><div class="file-name">${log.method} ${log.clean_host||log.host}</div><div style="font-size:10px;color:var(--muted)">${log.file_name||log.id}</div></div></div><div class="file-time">${log.time_str}<br>${log.date_str}</div></div>
-      <div class="file-meta"><span class="meta" style="background:#0a2e1a;color:#69f0ae">${log.status}</span><span class="meta">⏱️ ${log.duration_ms||0}ms</span><span class="meta">${log.category}</span>${log.tls_info && log.tls_info.tls_version ? `<span class="meta tls13">${log.tls_info.tls_version}</span>`:''}</div>
-      ${log.tls_info ? `<div class="decrypt"><div class="decrypt-title">🔓 ${log.tls_info.host} <span class="score ${log.tls_info.modern_score>70?'score-high':'score-mid'}">${log.tls_info.modern_score}/100</span></div><div class="decrypt-row"><span>SNI:</span> ${log.tls_info.sni}</div><div class="decrypt-row"><span>TLS:</span> ${log.tls_info.tls_version} • ${log.tls_info.cipher?log.tls_info.cipher.name:''}</div></div>`:''}
-      ${log.advanced ? `<div class="decrypt" style="border-color:#ff6f00;background:#1a0f00;"><div class="decrypt-title" style="color:#ff9e00;">🧠 ${log.advanced.protocol_guess} <span style="background:#ff6f00;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${log.advanced.entropy} entropy</span></div><div class="decrypt-row"><span>النوع:</span> <b>${log.advanced.protocol_guess}</b> — ${log.advanced.desc}</div><div class="decrypt-row"><span>الحجم:</span> ${log.advanced.size} bytes • ${log.advanced.duration_ms}ms</div><div class="decrypt-row"><span>الحماية:</span> <span style="color:#00e676;">🛡️ ${log.advanced.protection}</span> • ${log.advanced.risk}</div></div>`:''}
-      ${log.max_decrypt ? `<div class="decrypt" style="border-color:#00e676;background:#002a14;"><div class="decrypt-title" style="color:#00e676;">🔬 ${log.max_decrypt.inner_guess} <span class="score score-high">${log.max_decrypt.confidence}%</span></div><div class="decrypt-row"><span>الطبقات:</span> ${log.max_decrypt.layers.outer} → ${log.max_decrypt.layers.inner}</div><div class="decrypt-row"><span>مقروء:</span> ${log.max_decrypt.readable_now.size} • ${log.max_decrypt.readable_now.entropy} entropy</div><div class="decrypt-row"><span>الحماية:</span> <span style="color:#00e676;">${log.max_decrypt.protection.stealth}</span></div></div>`:''}
+      <div class="file-meta"><span class="meta" style="background:rgba(0,230,118,0.15);color:#69f0ae;">${log.status}</span><span class="meta">⏱️ ${log.duration_ms||0}ms</span><span class="meta">${log.category}</span>${log.tls_info && log.tls_info.tls_version ? `<span class="meta tls13">${log.tls_info.tls_version}</span>`:''}</div>
+      ${log.tls_info ? `<div class="decrypt"><div class="decrypt-title">🔓 ${log.tls_info.host} <span class="score ${log.tls_info.modern_score>70?'score-high':'score-mid'}">${log.tls_info.modern_score}/100</span></div><div class="decrypt-row"><span>SNI:</span> ${log.tls_info.sni}</div></div>`:''}
+      ${log.advanced ? `<div class="decrypt" style="border-color:rgba(255,111,0,0.4);background:rgba(26,15,0,0.6);"><div class="decrypt-title" style="color:#ff9e00;">🧠 ${log.advanced.protocol_guess}</div><div class="decrypt-row"><span>الحجم:</span> ${log.advanced.size} bytes</div></div>`:''}
+      ${log.max_decrypt ? `<div class="decrypt" style="border-color:rgba(0,230,118,0.4);background:rgba(0,42,20,0.6);"><div class="decrypt-title" style="color:#00e676;">🔬 ${log.max_decrypt.inner_guess} <span class="score score-high">${log.max_decrypt.confidence}%</span></div><div class="decrypt-row"><span>الطبقات:</span> ${log.max_decrypt.layers.inner}</div></div>`:''}
     </div>
   `).join('');
 }
 function renderFiles(files){
   const c=document.getElementById('files');
   if(!files.length){ c.innerHTML=`<div class="empty" style="grid-column:1/-1;"><div style="font-size:36px">📁</div><div>لا ملفات</div></div>`; return; }
-  c.innerHTML=files.map(f=>`<div class="file-card ${f.category}"><div class="file-head"><span>📄</span><span class="file-name">${f.file_name}</span><span class="file-time">${f.time}<br>${f.date}</span></div><div class="file-meta"><span class="meta">${f.category}</span><span class="meta">${f.host}</span><span class="meta">${f.status}</span></div></div>`).join('');
+  c.innerHTML=files.map(f=>`<div class="file-card ${f.category}"><div class="file-head"><span>📄</span><span class="file-name">${f.file_name}</span><span class="file-time">${f.time}<br>${f.date}</span></div><div class="file-meta"><span class="meta">${f.category}</span><span class="meta">${f.host}</span></div></div>`).join('');
 }
 function renderGrouped(g){
   const c=document.getElementById('grouped');
   if(!g || !g.by_host || Object.keys(g.by_host).length===0){ c.innerHTML=`<div class="empty"><div style="font-size:36px">🗂️</div><div>لا مجموعات</div></div>`; return; }
-  let h=''; for(const [host,data] of Object.entries(g.by_host)){ h+=`<div class="group"><div class="group-head"><span class="group-name">📁 ${host}</span><span class="group-count">${data.count}</span></div><div style="font-size:11px;color:var(--muted)">${data.category}</div><div style="margin-top:8px; display:grid; gap:5px;">${data.logs.map(l=>`<div style="background:#070d26; border:1px solid #1a2a4a; padding:7px; border-radius:6px; font-size:11px; display:flex; justify-content:space-between;"><span>${l.method} ${l.time_str} • ${l.status}</span><span>${l.duration_ms}ms</span></div>`).join('')}</div></div>`; }
+  let h=''; for(const [host,data] of Object.entries(g.by_host)){ h+=`<div class="group"><div class="group-head"><span class="group-name">📁 ${host}</span><span class="group-count">${data.count}</span></div><div style="margin-top:8px; display:grid; gap:5px;">${data.logs.map(l=>`<div style="background:rgba(7,13,38,0.8); border:1px solid var(--border); padding:7px; border-radius:8px; font-size:11px; display:flex; justify-content:space-between;"><span>${l.method} ${l.time_str}</span><span>${l.duration_ms}ms</span></div>`).join('')}</div></div>`; }
   c.innerHTML=h;
 }
 function renderCerts(logs){
   const c=document.getElementById('certs');
   const withCert=logs.filter(l=>l.tls_info);
   if(!withCert.length){ c.innerHTML=`<div class="empty" style="grid-column:1/-1;"><div style="font-size:36px">🔒</div><div>لا شهادات</div></div>`; return; }
-  c.innerHTML=withCert.map(l=>`<div class="file-card"><div class="decrypt"><div class="decrypt-title">🔒 ${l.tls_info.host} <span class="score ${l.tls_info.modern_score>70?'score-high':'score-mid'}">${l.tls_info.modern_score}/100</span></div><div class="decrypt-row"><span>TLS:</span> ${l.tls_info.tls_version} • ${l.tls_info.cipher.name}</div><div class="decrypt-row"><span>SNI:</span> ${l.tls_info.sni}</div></div></div>`).join('');
+  c.innerHTML=withCert.map(l=>`<div class="file-card"><div class="decrypt"><div class="decrypt-title">🔒 ${l.tls_info.host} <span class="score ${l.tls_info.modern_score>70?'score-high':'score-mid'}">${l.tls_info.modern_score}/100</span></div><div class="decrypt-row"><span>TLS:</span> ${l.tls_info.tls_version}</div></div></div>`).join('');
 }
 function filterLogs(){
   const q=document.getElementById('search').value.toLowerCase();
@@ -273,15 +259,10 @@ function filterLogs(){
   if(cat!=='all') url+='&category='+cat;
   fetch(url).then(r=>r.json()).then(j=>{ updateStats(j.stats); renderLogs(j.logs); });
 }
-async function clearLogs(){ if(!confirm('مسح كل السجلات؟'))return; await fetch('/api/clear',{method:'POST'}); fetchAll(); }
+async function clearLogs(){ if(!confirm('مسح؟'))return; await fetch('/api/clear',{method:'POST'}); fetchAll(); }
 async function exportJSON(){ const r=await fetch('/api/export'); const j=await r.json(); const b=new Blob([JSON.stringify(j,null,2)],{type:'application/json'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=`efootball_${j.export_date}.json`; a.click(); }
 async function exportCSV(){ location.href='/api/export/csv'; }
-function toggleAuto(){
-  auto=!auto;
-  const btn=document.getElementById('autoBtn');
-  if(auto){ timer=setInterval(fetchAll,2500); btn.textContent='⏸️ تلقائي'; }
-  else { clearInterval(timer); btn.textContent='▶️ تشغيل'; }
-}
+function toggleAuto(){ auto=!auto; const btn=document.getElementById('autoBtn'); if(auto){ timer=setInterval(fetchAll,2500); btn.textContent='⏸️ تلقائي'; } else { clearInterval(timer); btn.textContent='▶️ تشغيل'; } }
 fetchAll();
 </script>
 </body>
