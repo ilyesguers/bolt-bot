@@ -1,7 +1,6 @@
 # ⚡ eFootball Traffic Analyzer — v5.0 Final • 1000x Better
 
 <div align="center">
-
 ![Version](https://img.shields.io/badge/version-5.0.0-00E676?style=for-the-badge)
 ![Build](https://img.shields.io/badge/build-passing-2962FF?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-Railway%20%7C%20iPhone%2013-0A1433?style=for-the-badge)
