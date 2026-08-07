@@ -1,23 +1,49 @@
-# Data
-*.db
-*.json
-*.tmp
-
 # Python
 __pycache__/
 *.py[cod]
 *.pyo
+*.pyd
 .venv/
 venv/
-
-# Env
+env/
 .env
+*.egg-info/
+dist/
+build/
+
+# Mitmproxy
+.mitmproxy/
+mitmproxy-ca-*.pem
+mitmproxy-ca-*.p12
+*.cer
+
+# Certificates & Secrets - NEVER COMMIT
+*.p12
+*.mobileprovision
+*.ipa
+*.pem
+*.key
+*.crt
+secrets/
+certs/
+
+# Logs
+logs/
+*.log
+instance/
+
+# OS
+.DS_Store
+Thumbs.db
 
 # IDE
 .vscode/
 .idea/
 *.swp
+*.swo
 
-# OS
-.DS_Store
-Thumbs.db
+# Railway
+.railway/
+
+# Node (if needed)
+node_modules/
