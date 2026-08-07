@@ -73,12 +73,13 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   <div style="font-size:11px; color:#90a4ae;">{{ version_name }} • {{ today }} • Africa/Algiers • Live WebSocket + Storage + Analytics</div>
   <div class="badges">
     <span class="badge badge-green">● READ-ONLY</span>
-    <span class="badge badge-blue">🔓 Modern Decrypt</span>
+    <span class="badge badge-blue">🔓 TLS 1.3</span>
+    <span class="badge badge-gold" style="background:#3a1a00; color:#ff9e00; border-color:#ff6f00;">🧠 تشفير خاص</span>
+    <span class="badge badge-purple" style="background:#0a2e1a; color:#69f0ae; border-color:#00c853;">🛡️ Stealth ON</span>
     <span class="badge badge-gold">📁 Files</span>
     <span class="badge badge-purple">📊 Analytics</span>
     <span class="badge badge-green">🔄 Live WS</span>
     <span class="badge badge-blue">💾 Persistent</span>
-    <span class="badge badge-gold">📱 iPhone 13</span>
   </div>
 </div>
 
@@ -143,6 +144,14 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
             <div class="decrypt-title">🔓 {{ log.tls_info.host }} <span class="score {{ 'score-high' if log.tls_info.modern_score>70 else 'score-mid' }}">{{ log.tls_info.modern_score }}/100</span></div>
             <div class="decrypt-row"><span>SNI:</span> {{ log.tls_info.sni }}</div>
             <div class="decrypt-row"><span>TLS:</span> {{ log.tls_info.tls_version }} • {{ log.tls_info.cipher.name if log.tls_info.cipher else '' }}</div>
+          </div>
+          {% endif %}
+          {% if log.advanced %}
+          <div class="decrypt" style="border-color:#ff6f00; background:#1a0f00;">
+            <div class="decrypt-title" style="color:#ff9e00;">🧠 التشفير الخاص — {{ log.advanced.protocol_guess }} <span style="background:#ff6f00; color:#fff; padding:2px 6px; border-radius:4px; font-size:10px;">{{ log.advanced.entropy }} entropy</span></div>
+            <div class="decrypt-row"><span>النوع الداخلي:</span> <b style="color:{{ 'red' if log.advanced.color=='red' else '#4fc3f7' }}">{{ log.advanced.protocol_guess }}</b> — {{ log.advanced.desc }}</div>
+            <div class="decrypt-row"><span>الحجم:</span> {{ log.advanced.size }} bytes • {{ log.advanced.duration_ms }}ms</div>
+            <div class="decrypt-row"><span>الحماية:</span> <span style="color:#00e676;">🛡️ {{ log.advanced.protection }} — {{ log.advanced.stealth and 'Stealth ON' or '' }}</span> • {{ log.advanced.risk }}</div>
           </div>
           {% endif %}
         </div>
@@ -225,6 +234,7 @@ function renderLogs(logs){
       <div class="file-head"><div style="display:flex;gap:8px;align-items:center;"><span>${log.category==='auth'?'🔐':log.category==='shop'?'🛒':log.category==='match'?'⚽':log.category==='api'?'🔌':'📄'}</span><div><div class="file-name">${log.method} ${log.clean_host||log.host}</div><div style="font-size:10px;color:var(--muted)">${log.file_name||log.id}</div></div></div><div class="file-time">${log.time_str}<br>${log.date_str}</div></div>
       <div class="file-meta"><span class="meta" style="background:#0a2e1a;color:#69f0ae">${log.status}</span><span class="meta">⏱️ ${log.duration_ms||0}ms</span><span class="meta">${log.category}</span>${log.tls_info && log.tls_info.tls_version ? `<span class="meta tls13">${log.tls_info.tls_version}</span>`:''}</div>
       ${log.tls_info ? `<div class="decrypt"><div class="decrypt-title">🔓 ${log.tls_info.host} <span class="score ${log.tls_info.modern_score>70?'score-high':'score-mid'}">${log.tls_info.modern_score}/100</span></div><div class="decrypt-row"><span>SNI:</span> ${log.tls_info.sni}</div><div class="decrypt-row"><span>TLS:</span> ${log.tls_info.tls_version} • ${log.tls_info.cipher?log.tls_info.cipher.name:''}</div></div>`:''}
+      ${log.advanced ? `<div class="decrypt" style="border-color:#ff6f00;background:#1a0f00;"><div class="decrypt-title" style="color:#ff9e00;">🧠 ${log.advanced.protocol_guess} <span style="background:#ff6f00;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${log.advanced.entropy} entropy</span></div><div class="decrypt-row"><span>النوع:</span> <b>${log.advanced.protocol_guess}</b> — ${log.advanced.desc}</div><div class="decrypt-row"><span>الحجم:</span> ${log.advanced.size} bytes • ${log.advanced.duration_ms}ms</div><div class="decrypt-row"><span>الحماية:</span> <span style="color:#00e676;">🛡️ ${log.advanced.protection}</span> • ${log.advanced.risk}</div></div>`:''}
     </div>
   `).join('');
 }

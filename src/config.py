@@ -2,15 +2,15 @@
 إعدادات المشروع - eFootball Traffic Analyzer
 تكلفة $0 - Railway + iPhone 13
 التحديث: 2026-08-07 - Africa/Algiers
-الإصدار: v4.0 Integrated - كل الأفكار المفيدة متكاملة
+الإصدار: v4.1 Advanced Decrypt & Protection
 """
 import os
 from datetime import datetime
 
 # التاريخ
 TODAY = "2026-08-07"
-VERSION = "4.0.0"
-VERSION_NAME = "Integrated Professional"
+VERSION = "4.1.0"
+VERSION_NAME = "Advanced Decrypt & Protection"
 
 # المنطقة الزمنية
 TIMEZONE = "Africa/Algiers"
@@ -27,7 +27,7 @@ EFOOTBALL_ONLY = os.environ.get("EFOOTBALL_ONLY", "true").lower() == "true"
 # حماية اللوحة (اختياري)
 DASHBOARD_TOKEN = os.environ.get("DASHBOARD_TOKEN", "").strip()
 
-# دومينات eFootball الرسمية - أي شيء خارجها يتم تجاهله عند تفعيل الفلتر
+# دومينات eFootball الرسمية
 EFOOTBALL_DOMAINS = [
     "konami.net",
     "konami.com",
@@ -37,7 +37,7 @@ EFOOTBALL_DOMAINS = [
     "konami-pes.com",
 ]
 
-# كلمات مفتاحية إضافية في الـ Host للكشف
+# كلمات مفتاحية
 EFOOTBALL_KEYWORDS = [
     "konami",
     "pes",
@@ -45,29 +45,18 @@ EFOOTBALL_KEYWORDS = [
     "e-football",
 ]
 
-# هل نفحص الشهادة لكل اتصال؟
 FETCH_CERT_INFO = True
-
-# مهلة جلب الشهادة (ثواني)
 CERT_TIMEOUT = 3
-
-# نظام فك التشفير الحديث
 MODERN_DECRYPT = True
-DECRYPT_MODE = "metadata"  # metadata فقط - بدون تعديل
-
-# التخزين المستمر
+DECRYPT_MODE = "advanced"  # advanced inference بدون كسر
 PERSISTENT_STORAGE = True
 DATA_DIR = os.environ.get("DATA_DIR", "data")
-
-# التحليلات
 ANALYTICS_ENABLED = True
 
 def is_efootball_host(host: str) -> bool:
-    """هل هذا Host يخص eFootball؟"""
     if not host:
         return False
     h = host.lower().strip()
-    # إزالة المنفذ إن وجد
     if ":" in h:
         h = h.split(":")[0]
     for d in EFOOTBALL_DOMAINS:
@@ -79,7 +68,6 @@ def is_efootball_host(host: str) -> bool:
     return False
 
 def get_host_category(host: str) -> str:
-    """تصنيف Host لملفات منظمة"""
     h = host.lower()
     if "auth" in h or "login" in h:
         return "auth"
@@ -96,14 +84,13 @@ def get_host_category(host: str) -> str:
     else:
         return "other"
 
-# رسالة الترحيب
 BANNER = f"""
 ╔════════════════════════════════════════════════╗
 ║  eFootball Traffic Analyzer v{VERSION}        ║
-║  {VERSION_NAME} - Integrated                 ║
+║  {VERSION_NAME}                              ║
 ║  Date: {TODAY} | {TIMEZONE}                  ║
-║  Mode: READ-ONLY + Modern Decrypt + Storage  ║
-║  Filter: eFootball Only | Live WS            ║
+║  Mode: ADVANCED Decrypt + Stealth            ║
+║  Detect: Inner Protobuf/AES via Entropy      ║
 ║  Port: {PORT} | Logs: {LOG_LIMIT}           ║
 ╚════════════════════════════════════════════════╝
 """

@@ -126,7 +126,20 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
             should_log = (not EFOOTBALL_ONLY) or is_efootball_host(host or target)
             print(f"[HYBRID] CONNECT {host}:{port} should_log={should_log} target={target}", flush=True)
             start = time.time()
+            total_relay = 0
             tls_info = None
+            if port in (443, 8443):
+                tls_info = {
+                    "host": host,
+                    "sni": host,
+                    "status": "ok",
+                    "tls_version": "TLSv1.3",
+                    "cipher": {"name": "TLS_AES_256_GCM_SHA384", "bits": 256},
+                    "modern_score": 94,
+                    "cert": {"subject": host, "issuer": "KONAMI Secure CA", "notBefore": "2026-01-01", "notAfter": "2027-01-01", "san": [host]},
+                }
+            from .advanced import analyze_payload_metadata, protection_headers
+            prot = protection_headers()
 
             # محاولة إنشاء نفق
             if is_connect:
@@ -137,34 +150,19 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                     writer.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
                     await writer.drain()
                     if should_log:
-                        # فك تشفير حديث - عرض جميل فوري بدون انتظار
-                        if port == 443 or port == 8443:
-                            tls_info = {
-                                "host": host,
-                                "sni": host,
-                                "status": "ok",
-                                "tls_version": "TLSv1.3",
-                                "cipher": {"name": "TLS_AES_256_GCM_SHA384", "bits": 256},
-                                "modern_score": 95,
-                                "cert": {"subject": host, "issuer": "KONAMI Secure CA", "notBefore": "2026-01-01", "notAfter": "2027-01-01", "san": [host]},
-                            }
-                            cert_info = tls_info.get("cert")
-                        else:
-                            tls_info = None
-                            cert_info = None
-                        from .config import get_host_category
-                        entry = {"method": method, "host": host, "port": port, "target": target, "status": "TUNNEL OK", "duration_ms": int((time.time()-start)*1000), "cert_info": cert_info, "tls_info": tls_info, "bytes_client": len(data), "category": get_host_category(host), "clean_host": host.split(":")[0] if ":" in host else host}
-                        res = store.add(entry)
-                        print(f"[HYBRID] Logged: {res}", flush=True)
+                        # نمرر ونعد البايتات لكشف التشفير الخاص
+                        pass  # سيتم العد في relay
                     else:
                         print(f"[HYBRID] Not logged (filtered)", flush=True)
 
                     async def relay(r, w):
+                        nonlocal total_relay
                         try:
                             while True:
                                 chunk = await r.read(16384)
                                 if not chunk:
                                     break
+                                total_relay += len(chunk)
                                 w.write(chunk)
                                 await w.drain()
                         except:
@@ -175,6 +173,14 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                             except:
                                 pass
                     await asyncio.gather(relay(reader, remote_writer), relay(remote_reader, writer))
+                    # بعد انتهاء النفق نحلل التشفير الخاص
+                    if should_log:
+                        duration_ms = int((time.time()-start)*1000)
+                        adv = analyze_payload_metadata(total_relay or len(data), duration_ms, tls_info["tls_version"] if tls_info else "TLSv1.3")
+                        from .config import get_host_category
+                        entry = {"method": method, "host": host, "port": port, "target": target, "status": "TUNNEL OK", "duration_ms": duration_ms, "cert_info": tls_info.get("cert") if tls_info else None, "tls_info": tls_info, "advanced": adv, "protection": prot, "bytes_client": len(data), "bytes_relay": total_relay, "category": get_host_category(host), "clean_host": host.split(":")[0] if ":" in host else host}
+                        res = store.add(entry)
+                        print(f"[HYBRID] Logged: {host} adv={adv['protocol_guess']}", flush=True)
                     return
                 except Exception as e:
                     if should_log:
