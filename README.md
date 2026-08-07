@@ -1,131 +1,134 @@
-# ⚡ eFootball Traffic Analyzer — v5.0 Final • 1000x Better
+# ⚡ eFootball Traffic Analyzer — v5.1
 
 <div align="center">
-![Version](https://img.shields.io/badge/version-5.0.0-00E676?style=for-the-badge)
+
+![Version](https://img.shields.io/badge/version-5.1.0-00E676?style=for-the-badge)
 ![Build](https://img.shields.io/badge/build-passing-2962FF?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-Railway%20%7C%20iPhone%2013-0A1433?style=for-the-badge)
-![Cost](https://img.shields.io/badge/cost-$0-FF6F00?style=for-the-badge)
-![Date](https://img.shields.io/badge/date-2026--08--07-FFCA28?style=for-the-badge)
+![Date](https://img.shields.io/badge/date-2026--08--08-FFCA28?style=for-the-badge)
 
-**نظام متكامل 1000x أفضل — قراءة كل ما يدور بين السيرفر واللعبة مع فك تشفير حديث وحماية قصوى**
-
-*Beautiful • Integrated • Maximum Real Decrypt • Live • Persistent • Analytics*
+**Proxy passthrough + Dashboard + AI-host traffic metadata + persistent feature preferences**
 
 </div>
 
 ---
 
-## ✨ كل شيء 1000x أفضل
+## ما الجديد في v5.1
 
-| قبل | الآن v5.0 Final |
-|-----|----------------|
-| قراءة TLS فقط | **TLS 1.3 + SNI + Cipher + Cert + Entropy + Layers** |
-| سجل عادي | **كل اتصال = ملف منظم + مجمع حسب السيرفر + فك تشفير خاص** |
-| Polling | **Live WebSocket + Polling** |
-| يضيع بعد Restart | **Persistent Storage** |
-| لا تحليلات | **Analytics + Charts + CSV/JSON Export** |
-| يكشف كـ Proxy | **Stealth MAX — 0% detectable** |
-| تصميم عادي | **Glassmorphism + Animations + Beautiful** |
+- `src/ai_analyzer.py`: اكتشاف `pes22-game.cs.konami.net`، عينة محدودة إلى 1024 بايت، Entropy وإحصاءات الاتجاهين.
+- `src/features.py`: خمس تفضيلات AI محفوظة ذرياً في `data/features.json` مع إشعارات محدودة في الذاكرة.
+- تحليل اتصال AI في مساري التشغيل الفعليين: `src/main.py` و`src/proxy.py`.
+- `GET/POST /api/features` و`GET /api/notifications` مع تحقق من المدخلات والحماية الحالية للوحة.
+- لوحة عربية متجاوبة فيها خمسة checkboxes وزر حفظ وإشعارات مباشرة.
 
----
+## حدود تقنية مهمة
 
-## 🧠 أقصى فك تشفير واقعي
+اتصال HTTPS عبر `CONNECT` هو **نفق TLS مشفّر**. البروكسي الحالي يستطيع رؤية المضيف، الحجم، التوقيت وشكل ciphertext، لكنه لا يرى حقول اللعب أو قرار AI. في TLS 1.3، تعديل بايت عشوائي في ciphertext يفشل تحقق AEAD ويؤدي إلى إنهاء الاتصال؛ لذلك:
 
-```
-SNI: api.efootball.konami.net
-TLS: TLS 1.3 • TLS_AES_256_GCM_SHA384 • 96/100
-Entropy: 7.85 → Encrypted AES-GCM + Protobuf (Match Data) 92%
-Layers: TLS 1.3 → Custom XOR+HMAC → Protobuf
-Readable now: Size, Timing, Cert, SNI
-Protection: MAX STEALTH — Passthrough, No Headers, 0ms
-```
-
-**بدون كسر وهمي — نكتشف 92% من نوع البيانات بدون لمس Body المشفر الخاص.**
+- حركة CONNECT تمر byte-for-byte من دون تعديل.
+- تصنيف `AI Match Data / BehaviorTree / Config` تخمين مبني على الحجم وEntropy، وليس إثباتاً لبروتوكول داخلي.
+- اختيارات لوحة AI تُحفظ وتظهر في التحليل، لكنها لا تُطبّق على TLS ciphertext.
+- `modify_ai_payload()` موجود فقط لعينات مفكوكة/Offline؛ الـoffsets التجريبية ليست مخططاً موثقاً لبروتوكول KONAMI.
+- لا توجد مطالبة بأن التشغيل أو الحساب محميان من الحظر؛ استخدام أدوات طرف ثالث يجب أن يراعي شروط الخدمة.
 
 ---
 
-## 🏗️ المعمارية النهائية
+## المعمارية
 
+```text
+iPhone 13 (Manual HTTP Proxy over Wi-Fi)
+    │
+    ▼
+Railway TCP Proxy domain:generated-port ──► Hybrid service:$PORT
+                                              ├── CONNECT passthrough ──► destination
+                                              └── HTTP dashboard ──────► FastAPI:8001
+                                                     ├── Logs/Analytics
+                                                     ├── AI metadata
+                                                     └── Feature preferences
 ```
-iPhone 13 (Manual Proxy) → Railway:443 → Hybrid:8080
-    ├── CONNECT Tunnel (Stealth) → KONAMI
-    └── WebSocket + FastAPI → Dashboard (Live, Files, Analytics)
-            ├── Storage (data/logs.json)
-            ├── Decrypt (TLS + Entropy + Layers)
-            └── Protection (No Via, SNI Preserve)
-```
+
+`*.up.railway.app` هو نطاق HTTP للوحة. للوصول إلى خادم البروكسي كـraw TCP يجب تفعيل **Railway TCP Proxy** على المنفذ الداخلي نفسه واستخدام النطاق والمنفذ اللذين يولدهما Railway.
 
 ---
 
-## 🚀 التشغيل — دقيقة واحدة
+## التشغيل
+
+### محلياً
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+python -m src.main
+```
+
+- Dashboard: `http://localhost:8080`
+- Proxy: `localhost:8080`
 
 ### Railway
-```bash
-git push origin arena/019fdca0-bolt-bot
-# Railway → Deploy from GitHub → arena/019fdca0-bolt-bot → Generate Domain → xxx.up.railway.app
-```
-**iPhone 13:** `الإعدادات > Wi-Fi > ⓘ > تكوين البروكسي > يدوي` → Host `xxx.up.railway.app` Port `443` → افتح `https://xxx.up.railway.app`
 
-### محلي
-```bash
-pip install -r requirements.txt
-python -m src.main  # http://localhost:8080
-```
+1. انشر الفرع المطلوب من GitHub.
+2. أنشئ Public Domain للوحة، موجهاً إلى `$PORT`.
+3. من **Settings → Networking → TCP Proxy**، أنشئ TCP Proxy للمنفذ الداخلي `$PORT`.
+4. على iPhone: `الإعدادات → Wi‑Fi → ⓘ → تكوين البروكسي → يدوي`.
+5. استخدم `RAILWAY_TCP_PROXY_DOMAIN` و`RAILWAY_TCP_PROXY_PORT`، وليس نطاق لوحة HTTP مع المنفذ 443.
+
+> إعداد HTTP Proxy في iOS خاص بشبكة Wi‑Fi. بعض التطبيقات التي تستخدم networking مخصصاً قد لا تحترم إعداد النظام.
+
+### متغيرات البيئة
+
+| المتغير | الافتراضي | الوصف |
+|---|---:|---|
+| `PORT` | `8080` | منفذ الخدمة الداخلي |
+| `DASHBOARD_TOKEN` | فارغ | حماية API واللوحة عند ضبطه |
+| `DATA_DIR` | `data` | مسار logs وfeature preferences |
+| `FEATURES_FILE` | `$DATA_DIR/features.json` | مسار مخصص للتفضيلات |
+| `EFOOTBALL_ONLY` | `true` | تسجيل نطاقات eFootball فقط |
+
+للاستمرار بعد إعادة نشر Railway، اربط Volume واضبط `DATA_DIR` إلى مساره؛ نظام ملفات الحاوية وحده ليس تخزيناً دائماً مضموناً.
 
 ---
 
-## 📚 API المتكامل
+## API
 
 | Endpoint | الوصف |
-|----------|-------|
-| `GET /` | Dashboard Beautiful |
-| `GET /health` | Health + Uptime |
-| `GET /docs` | Swagger |
-| `GET /api/logs` | Logs + Search + Filter |
-| `GET /api/analytics` | Charts |
-| `GET /api/files` | Files |
-| `WS /ws/live` | Live |
-| `GET /api/export/csv` | CSV |
+|---|---|
+| `GET /` | لوحة التحكم |
+| `GET /health` | Health + uptime |
+| `GET /api/logs` | السجلات والبحث |
+| `GET /api/analytics` | التحليلات |
+| `GET /api/files` | الملفات والمجموعات |
+| `GET /api/features` | تعريفات الميزات وحالتها |
+| `POST /api/features` | حفظ قيم `true/false` |
+| `GET /api/notifications` | آخر عشرة إشعارات AI |
+| `WS /ws/live` | تحديثات مباشرة |
+| `GET /api/export/csv` | تصدير CSV |
 
----
+مثال:
 
-## 🔒 الحماية القصوى
-
-- **No Headers:** لا Via/X-Forwarded
-- **SNI Preserve:** كما هو
-- **0ms:** بدون تأخير
-- **Passthrough:** السيرفر يرى اللعبة مباشرة
-- **READ-ONLY:** لا تعديل — 0% حظر
-
----
-
-## 📂 الهيكل النهائي — 1000x مرتب
-
+```bash
+curl -X POST http://localhost:8080/api/features \
+  -H 'content-type: application/json' \
+  -d '{"features":{"slow_ai":true,"show_ai":false,"no_press":false,"stamina":false,"ai_miss":false}}'
 ```
+
+---
+
+## الاختبار
+
+```bash
+python3 -m py_compile src/*.py
+python3 -m unittest discover -s tests -v
+```
+
+## الملفات الأساسية
+
+```text
 src/
-  main.py (Hybrid Beautiful)
-  proxy.py (Stealth Tunnel)
-  web.py (Live WS + Analytics)
-  decrypt.py (Modern)
-  advanced.py (Entropy)
-  max_decrypt.py (Maximum Real)
-  logger.py (Storage)
-  storage.py (Persistent)
-  analytics.py (Charts)
-  config.py (2026-08-07 v5.0)
-  templates/index.html (Glassmorphism Beautiful)
-docs/
-  CONFIGURATION.md
-  ADVANCED_DECRYPTION.md
-  MAX_DECRYPT.md
+  main.py             Hybrid entry point
+  proxy.py            Standalone proxy handler
+  ai_analyzer.py      Bounded AI-host metadata analyzer
+  features.py         Preferences + notifications
+  web.py              FastAPI + feature APIs
+  templates/index.html
 ```
-
----
-
-<div align="center">
-
-**v5.0 Final • 2026-08-07 • Africa/Algiers • Beautiful Integrated • 1000x Better**
-
-*Made for iPhone 13 + Railway $0 — شغال 100%*
-
-</div>

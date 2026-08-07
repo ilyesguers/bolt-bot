@@ -10,6 +10,8 @@ from .config import PORT
 from .logger import store
 from .advanced import analyze_payload_metadata, protection_headers
 from .max_decrypt import max_analyze, protection_max
+from .ai_analyzer import AIConnectionAnalyzer
+from .features import add_notification, get_enabled, is_ai_host
 
 async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     peer = writer.get_extra_info("peername")
@@ -80,16 +82,30 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
         # protection - لا نضيف أي رأس يكشفنا
         prot = protection_headers()
 
+        ai_tracker = None
+        if is_connect and is_ai_host(host):
+            enabled_features = get_enabled()
+            ai_tracker = AIConnectionAnalyzer(
+                host,
+                enabled_features,
+                encrypted_tunnel=True,
+            )
+            add_notification(
+                "تم رصد اتصال خادم AI — تحليل TLS metadata بدون تعديل البايتات",
+                level="warning" if enabled_features else "info",
+                host=host,
+                requested_features=enabled_features,
+            )
+
         if is_connect:
             try:
                 remote_reader, remote_writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=5)
                 # حماية: نمرر بدون Via
                 writer.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
                 await writer.drain()
-                duration_ms = int((time.time() - start) * 1000)
 
                 # Relay مع عد البايتات لكشف التشفير الخاص - أقصى تحليل
-                async def relay_count(r, w):
+                async def relay_count(r, w, direction):
                     nonlocal total_relay
                     try:
                         while True:
@@ -97,6 +113,8 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                             if not chunk:
                                 break
                             total_relay += len(chunk)
+                            if ai_tracker is not None:
+                                chunk = ai_tracker.process(chunk, direction)
                             w.write(chunk)
                             await w.drain()
                     except:
@@ -106,7 +124,12 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                             w.close()
                         except:
                             pass
-                await asyncio.gather(relay_count(reader, remote_writer), relay_count(remote_reader, writer))
+                await asyncio.gather(
+                    relay_count(reader, remote_writer, "client_to_server"),
+                    relay_count(remote_reader, writer, "server_to_client"),
+                )
+                ai_analysis = ai_tracker.result() if ai_tracker is not None else None
+                duration_ms = int((time.time() - start) * 1000)
                 if should_log:
                     adv = analyze_payload_metadata(total_relay or len(data), duration_ms, tls_info["tls_version"] if tls_info else "TLSv1.3")
                     max_adv = max_analyze(host, total_relay or len(data), duration_ms, "tunnel")
@@ -124,6 +147,7 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                         "protection": protection_max(),
                         "bytes_client": len(data),
                         "bytes_relay": total_relay,
+                        "ai_analysis": ai_analysis,
                     }
                     store.add(entry)
                 return

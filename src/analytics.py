@@ -6,9 +6,12 @@ import time
 from collections import Counter, defaultdict
 from typing import List, Dict
 
+from .config import TODAY
+
+
 def compute_analytics(logs: List[Dict]) -> Dict:
     if not logs:
-        return {"empty": True, "today": "2026-08-07"}
+        return {"empty": True, "today": TODAY}
     
     # توزيع حسب التصنيف
     by_cat = Counter(l.get("category","other") for l in logs)
@@ -42,5 +45,5 @@ def compute_analytics(logs: List[Dict]) -> Dict:
         "min_ms": min_ms,
         "per_min": dict(per_min),
         "tls13_ratio": round(tls13/len(logs)*100) if logs else 0,
-        "today": "2026-08-07",
+        "today": TODAY,
     }

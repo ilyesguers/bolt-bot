@@ -27,9 +27,11 @@ mitmproxy-ca-*.p12
 secrets/
 certs/
 
-# Logs
+# Logs and runtime state
 logs/
 *.log
+data/*.json
+data/*.tmp
 instance/
 
 # OS
