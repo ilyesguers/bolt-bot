@@ -1,17 +1,25 @@
-# ⚡ eFootball Traffic Analyzer — v5.2
+# ⚡ eFootball Traffic Analyzer — v5.3
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-5.2.0-00E676?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-5.3.0-00E676?style=for-the-badge)
 ![Build](https://img.shields.io/badge/build-passing-2962FF?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-Railway%20%7C%20iPhone%2013-0A1433?style=for-the-badge)
 ![Date](https://img.shields.io/badge/date-2026--08--08-FFCA28?style=for-the-badge)
 
-**Proxy passthrough + Dashboard + AI-host traffic metadata + Feature Engine (target/timing) + Live Match Phase + Real Notifications**
+**Proxy passthrough + Dashboard + AI-host traffic metadata + Feature Engine (target/timing) + Live Match Phase + Real Notifications + Offline AI Match Mode + Mod Menu Control**
 
 </div>
 
 ---
+
+## ما الجديد في v5.3
+
+- **فهم الوضع الصحيح للمباريات الآفلانية (ضد AI)**: المباراة ضد الكمبيوتر تُلعب بالكامل على جهازك — لا يمر شيء منها عبر البروكسي. لهذا الميزات "الأسطورية" (إنهاء فوراً، فوز تلقائي...) تنفذ **داخل التطبيق المعدّل (Client-Side)** وليس عبر البروكسي.
+- **🛠️ لوحة تحكم مود مينو** (`src/modmenu.py`): 6 مفاتيح Client-Side (إنهاء المباراة فوراً، فوز تلقائي، إبطاء AI محلي، AI يخطئ، ستامينا، قيم 99) تُحفظ في `data/modmenu.json`، والتطبيق المعدّل يقرأها من `GET /api/modmenu/config`.
+- **🧭 كشف نمط المباراة** (تقدير من شكل الترافيك): `آفلان ضد AI` (حركة قليلة/مزامنة) مقابل `أونلاين` (حركة كثيفة) — يظهر في شريط المباراة + إشعار عند كل تصنيف.
+- **قالب dylib جاهز** في `modmenu/ios_dylib/ModMenu.m` يقرأ الإعدادات ويطبّقها محلياً، مع وثيقة `docs/OFFLINE_MOD_MENU.md` كاملة (البروتوكول + البناء + المخاطر).
+- **إشعارات فورية**: عند حفظ المود مينو أو تغيّر نمط المباراة تصلك Toast مباشرة.
 
 ## ما الجديد في v5.2
 
@@ -29,8 +37,9 @@
 - في TLS 1.3، تعديل أي بايت في ciphertext يفشل تحقق AEAD ويقطع الاتصال فوراً → المباراة تنتهي بفصل، لا بفوز.
 - **لا يمكن تعديل أي شيء على جهاز الخصم من بروكسيك**: الخصم له اتصال مستقل بسيرفر KONAMI، والسيرفر هو المرجع النهائي لكل القيم (Server-Side Verified). أي "ميزة على الخصم" من جهازك مستحيلة فيزيائياً — هذا ليس عيب برمجي.
 - لذلك ميزات **التعديل** (إبطاء AI، ستامينا، تسديد يخطئ، AI لا يضغط) تُحفظ وتُحلل وتُطبَّق على عينات مفكوكة/Offline فقط، وتظهر حالتها الحقيقية (`محجوبة — TLS مشفر`) في لوحة "حالة كل ميزة".
-- ميزات **الرصد** (تنبيه البداية/النهاية، متابعة المباراة، البينغ) تعمل فعلاً على الميتاداتا (أحجام، توقيت، فجوات) وتوصّل إشعارات حقيقية.
-- "أطوار المباراة" **تقدير** مبني على شكل الترافيك (حجم الدفعات والفجوات الزمنية)، وليست قراءة لبروتوكول KONAMI الداخلي.
+- **المباريات الآفلانية (ضد AI)** تُلعب على جهازك بالكامل — لا تمر عبر البروكسي إطلاقاً. تعديلها ممكن لكن **Client-Side** فقط (لعبة معدّلة تقرأ لوحة المود مينو من `/api/modmenu/config`)؛ البروكسي نفسه لا يلمسها. راجع `docs/OFFLINE_MOD_MENU.md`.
+- ميزات **الرصد** (تنبيه البداية/النهاية، متابعة المباراة، البينغ، نمط المباراة) تعمل فعلاً على الميتاداتا (أحجام، توقيت، فجوات) وتوصّل إشعارات حقيقية.
+- "أطوار المباراة" و"نمط المباراة" **تقدير** مبني على شكل الترافيك، وليس قراءة لبروتوكول KONAMI الداخلي.
 - لا توجد مطالبة بأن التشغيل أو الحساب محميان من الحظر؛ استخدام أدوات طرف ثالث يجب أن يراعي شروط الخدمة.
 
 ---
@@ -103,8 +112,11 @@ python -m src.main
 | `GET /api/features` | تعريفات الميزات + الحالة + الأهداف + التوقيتات + أطوار المباراة |
 | `POST /api/features` | حفظ `{"features":{...},"targets":{...},"timings":{...}}` |
 | `GET /api/notifications` | آخر عشرة إشعارات AI |
-| `GET /api/match` | طور المباراة التقديري + الخط الزمني + حالة الميزات |
-| `WS /ws/live` | تحديثات مباشرة (إحصائيات + سجلات + إشعارات + طور المباراة) |
+| `GET /api/match` | طور المباراة التقديري + نمطه + الخط الزمني + حالة الميزات |
+| `GET /api/modmenu` | تعريفات المود مينو وحالته |
+| `POST /api/modmenu` | حفظ مفاتيح المود مينو (`{"features":{...}}`) |
+| `GET /api/modmenu/config` | صيغة خفيفة للتطبيق المعدّل (dylib) |
+| `WS /ws/live` | تحديثات مباشرة (إحصائيات + سجلات + إشعارات + طور/نمط المباراة) |
 | `GET /api/export/csv` | تصدير CSV |
 
 مثال:
@@ -131,8 +143,10 @@ src/
   main.py             Hybrid entry point
   proxy.py            Standalone proxy handler
   ai_analyzer.py      Bounded AI-host metadata analyzer
-  match_tracker.py    Match phase estimator (heuristic) + timing gate
+  match_tracker.py    Match phase/mode estimator (heuristic) + timing gate
   features.py         Preferences, targets/timings, per-feature status + notifications
-  web.py              FastAPI + feature APIs
+  modmenu.py          Client-side mod menu config for offline AI matches
+  web.py              FastAPI + feature/modmenu APIs
   templates/index.html
+modmenu/ios_dylib/    ObjC template client (dylib) for the modified game
 ```

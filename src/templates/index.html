@@ -158,6 +158,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
   <div class="ai-notice">⚠️ الحقيقة التقنية: اتصال اللعبة TLS 1.3 مشفر، وميزات <b>التعديل</b> (إبطاء AI، ستامينا، تسديد يخطئ...) لا يمكن تطبيقها على ciphertext — تعديل أي بايت يفشل تحقق AEAD ويقطع المباراة. هذه الميزات تُحفظ وتُحلل وتُطبَّق على عينات Offline فقط، وتظهر حالتها بوضوح بالأسفل. أما ميزات <b>الرصد</b> (تنبيه البداية/النهاية، متابعة المباراة، البينغ) فتعمل فعلاً على الميتاداتا.</div>
   <div class="match-bar">
     <span class="match-phase" id="matchPhase">{{ match.phase_label if match else 'لا مباراة بعد' }}</span>
+    <span class="match-chip" id="matchMode" style="border-color:rgba(0,230,118,.35);color:#69f0ae;">🧭 {{ match.mode_label if match else 'نمط المباراة: غير محدد' }}</span>
     <span class="match-chip" id="matchPhaseSince">—</span>
     <span class="match-chip" id="matchConnCount">{{ match.connections if match else 0 }} اتصالات</span>
     <span class="match-chip" id="matchBytes">{{ match.server_bytes if match else 0 }}B ⬇ / {{ match.client_bytes if match else 0 }}B ⬆</span>
@@ -208,6 +209,33 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
         {% endif %}
       </div>
     </div>
+  </div>
+</section>
+<section class="ai-panel" style="border-color:rgba(0,230,118,.35);" aria-labelledby="modmenu-panel-title">
+  <div class="ai-panel-head">
+    <div>
+      <div class="ai-panel-title" id="modmenu-panel-title">🛠️ مود مينو — مباريات الآفلان ضد AI</div>
+      <div class="ai-panel-subtitle">Client-Side • التطبيق المعدّل يقرأ الإعدادات من <code style="color:var(--accent);">/api/modmenu/config</code> • محفوظة في data/modmenu.json</div>
+    </div>
+    <span class="badge badge-green">Client-Side Only</span>
+  </div>
+  <div class="ai-notice">💡 <b>ليه هذه الميزات تشتغل هنا والبروكسي ما يقدر؟</b> مباراة الكمبيوتر تُلعب بالكامل <b>على جهازك</b> (القرارات والنتيجة محلية، والسيرفر ما يتحقق من كل لحظة) — لهذا تنفع الميزات الأسطورية (إنهاء فوراً، فوز تلقائي، AI بطيء...). لكن تطبيقها يتم <b>داخل اللعبة المعدّلة</b> (IPA معدل + حقنة dylib) وليس عبر البروكسي. اللوحة هنا هي جهاز التحكم: شغّل الميزة، والتطبيق المعدّل يقرأها تلقائياً. بدون تطبيق معدل، هذه المفاتيح لا تؤثر في اللعبة الأصلية — شغل الإشعارات لتعرف وقت التفعيل.</div>
+  <div class="ai-feature-grid" id="modMenuGrid">
+    {% for key, feature in modmenu_features.items() %}
+    <label class="ai-feature" for="modmenu-{{ key }}">
+      <input class="modmenu-checkbox" type="checkbox" id="modmenu-{{ key }}" data-modmenu="{{ key }}" {% if modmenu_state.get(key) %}checked{% endif %}>
+      <span class="ai-feature-icon">{{ feature.icon }}</span>
+      <span>
+        <span class="ai-feature-name">{{ feature.name }}</span>
+        <span class="ai-feature-desc">{{ feature.desc }}</span>
+      </span>
+      <span class="ai-risk">{{ feature.risk }}</span>
+    </label>
+    {% endfor %}
+  </div>
+  <div class="ai-actions">
+    <button class="btn btn-success" id="saveModMenuBtn" onclick="saveModMenu()">💾 حفظ المود مينو</button>
+    <span class="ai-save-status" id="modMenuStatus">جاهز</span>
   </div>
 </section>
 <div id="toastBox"></div>
@@ -454,10 +482,52 @@ function renderMatchPhase(match){
   if(!match) return;
   const el = id=>document.getElementById(id);
   el('matchPhase').textContent = match.phase_label || match.phase || '—';
+  const modeEl = el('matchMode');
+  if(match.mode_label){
+    const isOffline = match.mode === 'offline_ai';
+    modeEl.textContent = '🧭 ' + (match.mode_label || 'نمط المباراة: غير محدد');
+    modeEl.style.borderColor = isOffline ? 'rgba(0,230,118,.35)' : 'rgba(79,195,247,.35)';
+    modeEl.style.color = isOffline ? '#69f0ae' : '#4fc3f7';
+  }
   el('matchPhaseSince').textContent = match.phase_since ? 'منذ ' + new Date(match.phase_since*1000).toLocaleTimeString('ar-DZ') : '—';
   el('matchConnCount').textContent = (match.connections||0) + ' اتصالات';
   el('matchBytes').textContent = (match.server_bytes||0) + 'B ⬇ / ' + (match.client_bytes||0) + 'B ⬆';
-  el('matchTimeline').innerHTML = (match.timeline||[]).map(e=>`<span>⚽ ${escapeHTML(e.label)} • ${new Date(e.timestamp*1000).toLocaleTimeString('ar-DZ')}</span>`).join('');
+  el('matchTimeline').innerHTML = (match.timeline||[]).map(e=>`<span>${e.kind==='mode'?'🧭':'⚽'} ${escapeHTML(e.label)} • ${new Date(e.timestamp*1000).toLocaleTimeString('ar-DZ')}</span>`).join('');
+}
+async function loadModMenu(){
+  try{
+    const response = await apiFetch('/api/modmenu');
+    if(!response.ok) throw new Error('تعذر تحميل المود مينو');
+    const data = await response.json();
+    document.querySelectorAll('.modmenu-checkbox').forEach(input=>{
+      input.checked = data.state?.[input.dataset.modmenu] === true;
+    });
+  }catch(error){
+    document.getElementById('modMenuStatus').textContent = error.message || 'تعذر تحميل المود مينو';
+  }
+}
+async function saveModMenu(){
+  const button = document.getElementById('saveModMenuBtn');
+  const status = document.getElementById('modMenuStatus');
+  const state = {};
+  document.querySelectorAll('.modmenu-checkbox').forEach(input=>state[input.dataset.modmenu]=input.checked);
+  button.disabled = true;
+  status.textContent = 'جارٍ الحفظ...';
+  try{
+    const response = await apiFetch('/api/modmenu', {
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({features:state})
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(typeof data.detail==='string' ? data.detail : 'فشل حفظ المود مينو');
+    status.textContent = '✓ حُفظت — التطبيق المعدّل يقرأها الآن';
+    await refreshNotifications();
+  }catch(error){
+    status.textContent = '✕ ' + (error.message || 'فشل الحفظ');
+  }finally{
+    button.disabled = false;
+  }
 }
 function renderLogs(logs){
   const c=document.getElementById('logs');
@@ -503,6 +573,7 @@ async function exportJSON(){ const r=await apiFetch('/api/export'); const j=awai
 async function exportCSV(){ location.href=apiUrl('/api/export/csv'); }
 function toggleAuto(){ auto=!auto; const btn=document.getElementById('autoBtn'); if(auto){ clearInterval(timer); timer=setInterval(fetchAll,2500); btn.textContent='⏸️ تلقائي'; } else { clearInterval(timer); btn.textContent='▶️ تشغيل'; } }
 loadAIFeatures();
+loadModMenu();
 fetchAll();
 </script>
 </body>

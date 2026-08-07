@@ -4,21 +4,24 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from src import features
+from src import features, modmenu
 from src.web import app
 
 
 class FeatureAPITests(unittest.TestCase):
     def setUp(self):
         self._original_file = features.DATA_FILE
+        self._original_modmenu = modmenu.DATA_FILE
         self._temp_dir = tempfile.TemporaryDirectory()
         features.DATA_FILE = Path(self._temp_dir.name) / "features.json"
+        modmenu.DATA_FILE = Path(self._temp_dir.name) / "modmenu.json"
         features.notifications.clear()
         self.client = TestClient(app)
 
     def tearDown(self):
         self.client.close()
         features.DATA_FILE = self._original_file
+        modmenu.DATA_FILE = self._original_modmenu
         features.notifications.clear()
         self._temp_dir.cleanup()
 
@@ -86,6 +89,34 @@ class FeatureAPITests(unittest.TestCase):
         self.assertEqual(body["match"]["phase"], "idle")
         self.assertTrue(body["match"]["heuristic"])
         self.assertEqual(len(body["statuses"]), 9)
+
+    def test_modmenu_get_post_and_light_config(self):
+        initial = self.client.get("/api/modmenu")
+        self.assertEqual(initial.status_code, 200)
+        self.assertEqual(len(initial.json()["features"]), 6)
+        self.assertFalse(any(initial.json()["state"].values()))
+
+        updated = self.client.post(
+            "/api/modmenu",
+            json={"features": {"instant_finish": True, "slow_ai_client": True}},
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(
+            updated.json()["enabled"], ["instant_finish", "slow_ai_client"]
+        )
+
+        light = self.client.get("/api/modmenu/config").json()
+        self.assertEqual(light["protocol"], 1)
+        self.assertTrue(light["features"]["instant_finish"])
+
+        rejected = self.client.post("/api/modmenu", json={"bogus": True})
+        self.assertEqual(rejected.status_code, 422)
+
+    def test_dashboard_contains_modmenu_panel(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("🛠️ مود مينو", response.text)
+        self.assertEqual(response.text.count('class="modmenu-checkbox"'), 6)
 
 
 if __name__ == "__main__":

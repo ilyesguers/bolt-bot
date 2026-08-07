@@ -25,6 +25,14 @@ from .match_tracker import tracker
 def _notify_match_events(events):
     """حوّل أحداث أطوار المباراة إلى إشعارات واضحة."""
     for event in events:
+        if event.get("kind") == "mode":
+            add_notification(
+                f"🧭 {event['label']}",
+                level="info",
+                category="mode",
+                mode=event.get("mode"),
+            )
+            continue
         add_notification(
             f"⚽ تقدير المباراة: {event['label']}",
             level="warning",

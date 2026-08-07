@@ -47,6 +47,24 @@ LONG_MATCH_SECONDS = 420.0 # مباراة تتجاوز 7 دقائق = قاربت
 FIRST_HALF_BURST = 5000    # دفعة بيانات مباراة ≥ 5KB = بدء الشوط الأول
 END_BURST = 8000           # دفعة كبيرة ≥ 8KB في الشوط الثاني = إشارة نهاية
 
+# تصنيف نمط المباراة (تقدير من شكل الترافيك)
+MODE_UNKNOWN = "unknown"
+MODE_OFFLINE = "offline_ai"
+MODE_ONLINE = "online"
+
+MODE_LABELS: dict[str, str] = {
+    MODE_UNKNOWN: "نمط المباراة: غير محدد",
+    MODE_OFFLINE: "آفلان ضد AI — تُلعب على جهازك",
+    MODE_ONLINE: "أونلاين — يتحكم بها السيرفر",
+}
+
+# عتبات التصنيف: الجلسة الآفلانية (ضد الكمبيوتر) لا ترسل إلا مزامنة قليلة،
+# بينما الأونلاين يتبادل بيانات كثيفة في الاتجاهين.
+OFFLINE_MAX_BYTES = 120_000   # جلسة ≥ دقيقة بأقل من 120KB ≈ مزامنة فقط
+OFFLINE_MIN_SECONDS = 60.0    # الحد الأدنى لمدة الجلسة للحكم
+ONLINE_MIN_BYTES = 300_000    # حركة كثيفة = مباراة أونلاين
+ONLINE_MIN_RATE = 4000        # ≥ 4KB/ثانية بمعدل ثابت
+
 
 class MatchTracker:
     """تتبع تقديري لأطوار المباراة عبر اتصالات خادم AI."""
@@ -62,18 +80,24 @@ class MatchTracker:
         self.client_bytes = 0
         self.last_activity: float | None = None
         self.timeline: deque[dict[str, Any]] = deque(maxlen=20)
+        self.mode = MODE_UNKNOWN
+        self.mode_determined_at: float | None = None
         self._active = 0
         self._last_conn_server = 0
         self._last_conn_client = 0
 
     # -- helpers ---------------------------------------------------------
-    def _add_event(self, phase: str) -> dict[str, Any]:
+    def _add_event(self, phase: str, kind: str = "phase") -> dict[str, Any]:
         event = {
+            "kind": kind,
             "phase": phase,
             "label": PHASE_LABELS[phase],
             "timestamp": self._now(),
             "connections": self.connections,
         }
+        if kind == "mode":
+            event["mode"] = self.mode
+            event["label"] = MODE_LABELS.get(self.mode, self.mode)
         self.timeline.append(event)
         return event
 
@@ -97,6 +121,8 @@ class MatchTracker:
                 self.client_bytes = 0
                 self._last_conn_server = 0
                 self._last_conn_client = 0
+                self.mode = MODE_UNKNOWN
+                self.mode_determined_at = None
                 events.append(self._add_event(PHASE_KICKOFF))
             elif self.phase == PHASE_HALFTIME:
                 # انتهت الاستراحة وعاد اللعب
@@ -175,7 +201,27 @@ class MatchTracker:
                     self.phase = PHASE_FULL_TIME
                     self.phase_since = now
                     events.append(self._add_event(PHASE_FULL_TIME))
+
+            # تصنيف نمط المباراة عند اكتمال الجلسة (تقدير)
+            mode = self._classify_mode(session_age)
+            if mode != self.mode:
+                self.mode = mode
+                self.mode_determined_at = now
+                events.append(self._add_event(self.phase, kind="mode"))
         return events
+
+    def _classify_mode(self, duration: float) -> str:
+        """من حجم الجلسة ومعدلها: آفلان (مزامنة فقط) أم أونلاين (كثيف) أم غير محدد."""
+        total = self.server_bytes + self.client_bytes
+        if total == 0:
+            return MODE_UNKNOWN
+        if duration >= OFFLINE_MIN_SECONDS and total <= OFFLINE_MAX_BYTES:
+            return MODE_OFFLINE
+        if total >= ONLINE_MIN_BYTES or (
+            duration >= OFFLINE_MIN_SECONDS and (total / duration) >= ONLINE_MIN_RATE
+        ):
+            return MODE_ONLINE
+        return MODE_UNKNOWN
 
     # -- read ------------------------------------------------------------
     def snapshot(self) -> dict[str, Any]:
@@ -200,6 +246,10 @@ class MatchTracker:
                 "client_bytes": self.client_bytes,
                 "active_connections": self._active,
                 "last_activity": self.last_activity,
+                "mode": self.mode,
+                "mode_label": MODE_LABELS.get(self.mode, self.mode),
+                "mode_heuristic": True,
+                "mode_determined_at": self.mode_determined_at,
                 "timeline": list(self.timeline)[-8:][::-1],
                 "heuristic": True,
                 "note": (

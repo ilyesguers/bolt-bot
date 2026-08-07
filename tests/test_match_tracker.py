@@ -2,6 +2,9 @@ import unittest
 
 from src.match_tracker import (
     MatchTracker,
+    MODE_OFFLINE,
+    MODE_ONLINE,
+    MODE_UNKNOWN,
     PHASE_FIRST_HALF,
     PHASE_FULL_TIME,
     PHASE_HALFTIME,
@@ -54,7 +57,7 @@ class MatchTrackerTests(unittest.TestCase):
         self.tracker.connection_start("host")
         self.clock.advance(60)
         events = self.tracker.connection_end("host")
-        phases = [e["phase"] for e in events]
+        phases = [e["phase"] for e in events if e["kind"] == "phase"]
         self.assertEqual(phases, [PHASE_HALFTIME])
 
     def test_gap_after_first_half_moves_to_second_half_on_resume(self):
@@ -127,6 +130,35 @@ class MatchTrackerTests(unittest.TestCase):
         self.assertTrue(snap["heuristic"])
         self.assertIn("تقدير", snap["note"])
         self.assertEqual(snap["phase"], PHASE_IDLE)
+
+    def test_sparse_session_is_classified_offline_ai(self):
+        # جلسة طويلة بحركة قليلة (مزامنة فقط) = مباراة آفلان ضد AI
+        self.tracker.connection_start("host")
+        self.clock.advance(30)
+        self.tracker.chunk("server_to_client", 3000)
+        self.clock.advance(30)
+        self.tracker.chunk("client_to_server", 800)
+        self.clock.advance(30)
+        events = self.tracker.connection_end("host")
+        self.assertEqual(self.tracker.snapshot()["mode"], MODE_OFFLINE)
+        self.assertIn("آفلان", self.tracker.snapshot()["mode_label"])
+        self.assertTrue(any(e.get("kind") == "mode" for e in events))
+
+    def test_heavy_session_is_classified_online(self):
+        self.tracker.connection_start("host")
+        for _ in range(10):
+            self.tracker.chunk("server_to_client", 40_000)
+            self.clock.advance(2)
+        events = self.tracker.connection_end("host")
+        self.assertEqual(self.tracker.snapshot()["mode"], MODE_ONLINE)
+        self.assertTrue(any(e.get("kind") == "mode" for e in events))
+
+    def test_empty_short_session_is_unknown(self):
+        self.tracker.connection_start("host")
+        self.clock.advance(10)
+        events = self.tracker.connection_end("host")
+        self.assertEqual(self.tracker.snapshot()["mode"], MODE_UNKNOWN)
+        self.assertEqual(events, [])  # لا أحداث نمط لجلسة بلا بيانات
 
 
 class TimingGateTests(unittest.TestCase):

@@ -17,6 +17,9 @@ from .logger import store
 from .analytics import compute_analytics
 from .auth import check_auth
 from .match_tracker import tracker
+from .modmenu import FEATURES as MODMENU_FEATURES
+from .modmenu import config_payload, get_enabled as get_modmenu_enabled
+from .modmenu import load_config, save_config as save_modmenu
 from .features import (
     FEATURES,
     TARGETS,
@@ -236,6 +239,71 @@ async def api_match(auth=Depends(check_auth)):
     }
 
 
+def _modmenu_response():
+    cfg = load_config()
+    return {
+        "features": MODMENU_FEATURES,
+        "state": cfg["features"],
+        "enabled": get_modmenu_enabled(),
+        "updated_at": cfg["updated_at"],
+        "protocol": cfg["protocol"],
+        "notice": (
+            "المباراة ضد الكمبيوتر تُلعب على جهازك — هذه الإعدادات يقرأها "
+            "التطبيق المعدّل (IPA + dylib) ويطبّقها محلياً. البروكسي لا يعدّل "
+            "أي شيء لأن المباراة ليست على الشبكة."
+        ),
+    }
+
+
+@app.get("/api/modmenu")
+async def api_modmenu(auth=Depends(check_auth)):
+    return _modmenu_response()
+
+
+@app.post("/api/modmenu")
+async def api_modmenu_update(request: Request, auth=Depends(check_auth)):
+    try:
+        payload = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="JSON body مطلوب")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="يجب إرسال JSON object")
+
+    values = payload.get("features", payload)
+    if not isinstance(values, dict):
+        raise HTTPException(status_code=422, detail="features يجب أن تكون object")
+
+    unknown = sorted(set(values) - set(MODMENU_FEATURES))
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "ميزات مود مينو غير معروفة", "keys": unknown},
+        )
+    invalid = sorted(key for key, value in values.items() if type(value) is not bool)
+    if invalid:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "قيم الميزات يجب أن تكون true/false", "keys": invalid},
+        )
+
+    saved = save_modmenu(values)
+    enabled_names = [MODMENU_FEATURES[key]["name"] for key, value in saved["features"].items() if value]
+    add_notification(
+        "🛠️ تم حفظ إعدادات المود مينو"
+        + (f": {', '.join(enabled_names)}" if enabled_names else " — جميعها متوقفة"),
+        level="success",
+        enabled=get_modmenu_enabled(),
+    )
+    return _modmenu_response()
+
+
+@app.get("/api/modmenu/config")
+async def api_modmenu_config(auth=Depends(check_auth)):
+    """صيغة خفيفة للتطبيق المعدّل — يقرأها الـ dylib كل بضع ثوانٍ."""
+    return config_payload()
+
+
 @app.get("/api/export")
 async def api_export(auth=Depends(check_auth)):
     return {"export_date": TODAY, "version": VERSION, "logs": store.get_all(limit=800), "stats": store.get_stats()}
@@ -278,6 +346,8 @@ def _dashboard_context():
         "prefs": load_prefs(),
         "match": tracker.snapshot(),
         "notifications": get_notifications(),
+        "modmenu_features": MODMENU_FEATURES,
+        "modmenu_state": load_config()["features"],
     }
 
 @app.get("/", response_class=HTMLResponse)
