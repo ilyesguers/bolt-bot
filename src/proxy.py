@@ -9,6 +9,7 @@ import re
 from .config import PORT
 from .logger import store
 from .advanced import analyze_payload_metadata, protection_headers
+from .max_decrypt import max_analyze, protection_max
 
 async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     peer = writer.get_extra_info("peername")
@@ -87,7 +88,7 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                 await writer.drain()
                 duration_ms = int((time.time() - start) * 1000)
 
-                # Relay مع عد البايتات لكشف التشفير الخاص
+                # Relay مع عد البايتات لكشف التشفير الخاص - أقصى تحليل
                 async def relay_count(r, w):
                     nonlocal total_relay
                     try:
@@ -105,12 +106,10 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                             w.close()
                         except:
                             pass
-
-                # نبدأ relay ونحسب
                 await asyncio.gather(relay_count(reader, remote_writer), relay_count(remote_reader, writer))
-                # بعد انتهاء النفق نحلل
                 if should_log:
                     adv = analyze_payload_metadata(total_relay or len(data), duration_ms, tls_info["tls_version"] if tls_info else "TLSv1.3")
+                    max_adv = max_analyze(host, total_relay or len(data), duration_ms, "tunnel")
                     entry = {
                         "method": method,
                         "host": host,
@@ -121,7 +120,8 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                         "cert_info": tls_info.get("cert") if tls_info else None,
                         "tls_info": tls_info,
                         "advanced": adv,
-                        "protection": prot,
+                        "max_decrypt": max_adv,
+                        "protection": protection_max(),
                         "bytes_client": len(data),
                         "bytes_relay": total_relay,
                     }
@@ -161,7 +161,8 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                 writer.close()
                 if should_log:
                     adv = analyze_payload_metadata(total_bytes or len(data), int((time.time()-start)*1000), tls_info["tls_version"] if tls_info else "TLSv1.3")
-                    store.add({"method": method, "host": host, "port": port, "target": target, "status": f"HTTP {total_bytes} bytes", "duration_ms": int((time.time() - start)*1000), "tls_info": tls_info, "advanced": adv, "protection": prot})
+                    max_adv = max_analyze(host, total_bytes or len(data), int((time.time()-start)*1000), "http")
+                    store.add({"method": method, "host": host, "port": port, "target": target, "status": f"HTTP {total_bytes} bytes", "duration_ms": int((time.time() - start)*1000), "tls_info": tls_info, "advanced": adv, "max_decrypt": max_adv, "protection": protection_max()})
             except Exception as e:
                 if should_log:
                     store.add({"method": method, "host": host or target, "port": port, "target": target, "status": f"HTTP FAILED: {str(e)[:60]}", "duration_ms": int((time.time() - start)*1000), "tls_info": tls_info})

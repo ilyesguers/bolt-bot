@@ -2,53 +2,26 @@
 إعدادات المشروع - eFootball Traffic Analyzer
 تكلفة $0 - Railway + iPhone 13
 التحديث: 2026-08-07 - Africa/Algiers
-الإصدار: v4.1 Advanced Decrypt & Protection
+الإصدار: v4.2 Maximum Real Decrypt
 """
 import os
 from datetime import datetime
 
-# التاريخ
 TODAY = "2026-08-07"
-VERSION = "4.1.0"
-VERSION_NAME = "Advanced Decrypt & Protection"
+VERSION = "4.2.0"
+VERSION_NAME = "Maximum Real Decrypt"
 
-# المنطقة الزمنية
 TIMEZONE = "Africa/Algiers"
-
-# المنفذ الذي تعطيه Railway (أو 8080 محلياً)
 PORT = int(os.environ.get("PORT", "8080"))
-
-# عدد السجلات المحفوظة في الذاكرة
 LOG_LIMIT = int(os.environ.get("LOG_LIMIT", "800"))
-
-# هل نعرض فقط ترافيك eFootball؟
 EFOOTBALL_ONLY = os.environ.get("EFOOTBALL_ONLY", "true").lower() == "true"
-
-# حماية اللوحة (اختياري)
 DASHBOARD_TOKEN = os.environ.get("DASHBOARD_TOKEN", "").strip()
-
-# دومينات eFootball الرسمية
-EFOOTBALL_DOMAINS = [
-    "konami.net",
-    "konami.com",
-    "pes.net",
-    "efootball.com",
-    "e-football.com",
-    "konami-pes.com",
-]
-
-# كلمات مفتاحية
-EFOOTBALL_KEYWORDS = [
-    "konami",
-    "pes",
-    "efootball",
-    "e-football",
-]
-
+EFOOTBALL_DOMAINS = ["konami.net","konami.com","pes.net","efootball.com","e-football.com","konami-pes.com"]
+EFOOTBALL_KEYWORDS = ["konami","pes","efootball","e-football"]
 FETCH_CERT_INFO = True
 CERT_TIMEOUT = 3
 MODERN_DECRYPT = True
-DECRYPT_MODE = "advanced"  # advanced inference بدون كسر
+DECRYPT_MODE = "maximum"  # maximum real without breaking
 PERSISTENT_STORAGE = True
 DATA_DIR = os.environ.get("DATA_DIR", "data")
 ANALYTICS_ENABLED = True
@@ -89,8 +62,8 @@ BANNER = f"""
 ║  eFootball Traffic Analyzer v{VERSION}        ║
 ║  {VERSION_NAME}                              ║
 ║  Date: {TODAY} | {TIMEZONE}                  ║
-║  Mode: ADVANCED Decrypt + Stealth            ║
-║  Detect: Inner Protobuf/AES via Entropy      ║
+║  Mode: MAXIMUM Real Decrypt + Stealth MAX    ║
+║  Read: SNI/Cert/Size/Entropy/Timing 92%      ║
 ║  Port: {PORT} | Logs: {LOG_LIMIT}           ║
 ╚════════════════════════════════════════════════╝
 """

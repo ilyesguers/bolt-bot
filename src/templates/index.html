@@ -154,6 +154,15 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
             <div class="decrypt-row"><span>الحماية:</span> <span style="color:#00e676;">🛡️ {{ log.advanced.protection }} — {{ log.advanced.stealth and 'Stealth ON' or '' }}</span> • {{ log.advanced.risk }}</div>
           </div>
           {% endif %}
+          {% if log.max_decrypt %}
+          <div class="decrypt" style="border-color:#00e676; background:#002a14;">
+            <div class="decrypt-title" style="color:#00e676;">🔬 أقصى تحليل واقعي — {{ log.max_decrypt.inner_guess }} <span class="score score-high">{{ log.max_decrypt.confidence }}%</span></div>
+            <div class="decrypt-row"><span>الطبقات:</span> {{ log.max_decrypt.layers.outer }} → {{ log.max_decrypt.layers.middle }} → {{ log.max_decrypt.layers.inner }}</div>
+            <div class="decrypt-row"><span>مقروء الآن:</span> {{ log.max_decrypt.readable_now.sni }} • {{ log.max_decrypt.readable_now.size }} • {{ log.max_decrypt.readable_now.entropy }} entropy</div>
+            <div class="decrypt-row"><span>يحتاج MITM:</span> <span style="color:#ff9e00;">{{ log.max_decrypt.needs_mitm.body_json }}</span></div>
+            <div class="decrypt-row"><span>الحماية القصوى:</span> <span style="color:#00e676;">{{ log.max_decrypt.protection.stealth }}</span> — {{ log.max_decrypt.summary }}</div>
+          </div>
+          {% endif %}
         </div>
         {% endfor %}
       {% else %}
@@ -235,6 +244,7 @@ function renderLogs(logs){
       <div class="file-meta"><span class="meta" style="background:#0a2e1a;color:#69f0ae">${log.status}</span><span class="meta">⏱️ ${log.duration_ms||0}ms</span><span class="meta">${log.category}</span>${log.tls_info && log.tls_info.tls_version ? `<span class="meta tls13">${log.tls_info.tls_version}</span>`:''}</div>
       ${log.tls_info ? `<div class="decrypt"><div class="decrypt-title">🔓 ${log.tls_info.host} <span class="score ${log.tls_info.modern_score>70?'score-high':'score-mid'}">${log.tls_info.modern_score}/100</span></div><div class="decrypt-row"><span>SNI:</span> ${log.tls_info.sni}</div><div class="decrypt-row"><span>TLS:</span> ${log.tls_info.tls_version} • ${log.tls_info.cipher?log.tls_info.cipher.name:''}</div></div>`:''}
       ${log.advanced ? `<div class="decrypt" style="border-color:#ff6f00;background:#1a0f00;"><div class="decrypt-title" style="color:#ff9e00;">🧠 ${log.advanced.protocol_guess} <span style="background:#ff6f00;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${log.advanced.entropy} entropy</span></div><div class="decrypt-row"><span>النوع:</span> <b>${log.advanced.protocol_guess}</b> — ${log.advanced.desc}</div><div class="decrypt-row"><span>الحجم:</span> ${log.advanced.size} bytes • ${log.advanced.duration_ms}ms</div><div class="decrypt-row"><span>الحماية:</span> <span style="color:#00e676;">🛡️ ${log.advanced.protection}</span> • ${log.advanced.risk}</div></div>`:''}
+      ${log.max_decrypt ? `<div class="decrypt" style="border-color:#00e676;background:#002a14;"><div class="decrypt-title" style="color:#00e676;">🔬 ${log.max_decrypt.inner_guess} <span class="score score-high">${log.max_decrypt.confidence}%</span></div><div class="decrypt-row"><span>الطبقات:</span> ${log.max_decrypt.layers.outer} → ${log.max_decrypt.layers.inner}</div><div class="decrypt-row"><span>مقروء:</span> ${log.max_decrypt.readable_now.size} • ${log.max_decrypt.readable_now.entropy} entropy</div><div class="decrypt-row"><span>الحماية:</span> <span style="color:#00e676;">${log.max_decrypt.protection.stealth}</span></div></div>`:''}
     </div>
   `).join('');
 }

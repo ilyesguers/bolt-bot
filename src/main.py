@@ -139,7 +139,8 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                     "cert": {"subject": host, "issuer": "KONAMI Secure CA", "notBefore": "2026-01-01", "notAfter": "2027-01-01", "san": [host]},
                 }
             from .advanced import analyze_payload_metadata, protection_headers
-            prot = protection_headers()
+            from .max_decrypt import max_analyze, protection_max
+            prot = protection_max()
 
             # محاولة إنشاء نفق
             if is_connect:
@@ -173,14 +174,15 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                             except:
                                 pass
                     await asyncio.gather(relay(reader, remote_writer), relay(remote_reader, writer))
-                    # بعد انتهاء النفق نحلل التشفير الخاص
+                    # بعد انتهاء النفق نحلل أقصى فك تشفير واقعي
                     if should_log:
                         duration_ms = int((time.time()-start)*1000)
                         adv = analyze_payload_metadata(total_relay or len(data), duration_ms, tls_info["tls_version"] if tls_info else "TLSv1.3")
+                        max_adv = max_analyze(host, total_relay or len(data), duration_ms, "tunnel")
                         from .config import get_host_category
-                        entry = {"method": method, "host": host, "port": port, "target": target, "status": "TUNNEL OK", "duration_ms": duration_ms, "cert_info": tls_info.get("cert") if tls_info else None, "tls_info": tls_info, "advanced": adv, "protection": prot, "bytes_client": len(data), "bytes_relay": total_relay, "category": get_host_category(host), "clean_host": host.split(":")[0] if ":" in host else host}
+                        entry = {"method": method, "host": host, "port": port, "target": target, "status": "TUNNEL OK", "duration_ms": duration_ms, "cert_info": tls_info.get("cert") if tls_info else None, "tls_info": tls_info, "advanced": adv, "max_decrypt": max_adv, "protection": prot, "bytes_client": len(data), "bytes_relay": total_relay, "category": get_host_category(host), "clean_host": host.split(":")[0] if ":" in host else host}
                         res = store.add(entry)
-                        print(f"[HYBRID] Logged: {host} adv={adv['protocol_guess']}", flush=True)
+                        print(f"[HYBRID] Logged: {host} max={max_adv['inner_guess']} {max_adv['confidence']}%", flush=True)
                     return
                 except Exception as e:
                     if should_log:
