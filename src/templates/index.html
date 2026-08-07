@@ -3,182 +3,346 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>eFootball Analyzer - Logs</title>
+<title>eFootball Analyzer v{{ version }} — {{ today }}</title>
 <style>
+:root { --bg:#060a1a; --card:#0f1a33; --card2:#0c1530; --border:#1e3a5f; --accent:#4fc3f7; --green:#00e676; --gold:#ffca28; --text:#e3f2fd; --muted:#78909c; }
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family: 'Segoe UI', Tahoma, sans-serif; background:#0a0e1a; color:#e0e6ed; }
-.header { background: linear-gradient(135deg,#0f1b3d 0%,#1a2a5c 100%); padding:20px; border-bottom:2px solid #2a4a8a; }
-.header h1 { font-size:22px; color:#4fc3f7; }
-.header p { font-size:13px; color:#8899aa; margin-top:6px; }
-.badges { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
-.badge { padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600; }
-.badge-green { background:#1b5e20; color:#81c784; border:1px solid #2e7d32; }
-.badge-blue { background:#0d47a1; color:#90caf9; border:1px solid #1565c0; }
-.badge-gold { background:#f57f17; color:#fff; border:1px solid #ff8f00; }
-.stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:12px; padding:16px; }
-.stat-card { background:#111a33; border:1px solid #1e3a5f; border-radius:10px; padding:14px; text-align:center; }
-.stat-card .num { font-size:24px; font-weight:800; color:#4fc3f7; }
-.stat-card .label { font-size:11px; color:#8899aa; margin-top:4px; }
-.controls { padding:12px 16px; display:flex; gap:8px; flex-wrap:wrap; }
-.btn { padding:8px 16px; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; }
+body { font-family: 'Segoe UI', Tahoma, system-ui, sans-serif; background: var(--bg); color: var(--text); line-height:1.5; }
+.header { background: linear-gradient(135deg,#0a1433 0%,#16295e 50%,#1a3a7a 100%); padding:22px 20px; border-bottom:2px solid #2a4a8a; position:sticky; top:0; z-index:10; }
+.header-top { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
+.header h1 { font-size:22px; color:var(--accent); display:flex; align-items:center; gap:10px; }
+.header h1 span { font-size:13px; background:rgba(79,195,247,0.15); padding:4px 10px; border-radius:20px; border:1px solid rgba(79,195,247,0.3); }
+.header p { font-size:12px; color:#90a4ae; margin-top:6px; }
+.badges { display:flex; gap:7px; margin-top:14px; flex-wrap:wrap; }
+.badge { padding:5px 11px; border-radius:20px; font-size:11px; font-weight:700; display:flex; align-items:center; gap:4px; }
+.badge-green { background:#0a2e1a; color:#69f0ae; border:1px solid #00c853; }
+.badge-blue { background:#0d2a5a; color:#82b1ff; border:1px solid #2962ff; }
+.badge-gold { background:#3a2e00; color:#ffd740; border:1px solid #ffab00; }
+.badge-purple { background:#1a0a3a; color:#b388ff; border:1px solid #651fff; }
+.live-dot { width:9px; height:9px; background:var(--green); border-radius:50%; display:inline-block; animation:pulse 1.4s infinite; box-shadow:0 0 8px var(--green); }
+@keyframes pulse { 0%,100%{opacity:1; transform:scale(1)} 50%{opacity:0.6; transform:scale(1.1)} }
+.stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:12px; padding:16px; }
+.stat { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:15px; text-align:center; position:relative; overflow:hidden; }
+.stat::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg, var(--accent), var(--green)); opacity:0.6; }
+.stat .num { font-size:26px; font-weight:900; color:var(--accent); }
+.stat .label { font-size:10px; color:var(--muted); margin-top:4px; letter-spacing:0.5px; }
+.controls { padding:14px 16px; background:var(--card2); border-top:1px solid var(--border); border-bottom:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.controls input { background:#0a1433; border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:8px; font-size:13px; min-width:200px; flex:1; max-width:320px; }
+.btn { padding:8px 14px; border:none; border-radius:8px; cursor:pointer; font-weight:700; font-size:12px; display:flex; align-items:center; gap:5px; transition:0.2s; }
+.btn:hover { transform:translateY(-1px); }
 .btn-primary { background:#1565c0; color:#fff; }
+.btn-success { background:#2e7d32; color:#fff; }
 .btn-danger { background:#c62828; color:#fff; }
-.btn-secondary { background:#263238; color:#90a4ae; border:1px solid #37474f; }
-.logs { padding:16px; }
-.log-card { background:#111a33; border:1px solid #1e3a5f; border-radius:10px; padding:14px; margin-bottom:10px; border-right:4px solid #1565c0; }
-.log-card.efootball { border-right-color:#2e7d32; background:#0f1f15; }
-.log-head { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; }
-.log-host { font-weight:700; color:#4fc3f7; font-size:14px; word-break:break-all; }
-.log-time { font-size:11px; color:#78909c; }
-.log-meta { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
-.meta { font-size:11px; padding:4px 8px; border-radius:6px; background:#1a2a4a; color:#b0bec5; border:1px solid #263859; }
-.meta.ok { background:#1b5e20; color:#a5d6a7; border-color:#2e7d32; }
-.meta.fail { background:#b71c1c; color:#ef9a9a; border-color:#c62828; }
-.cert { margin-top:10px; background:#0d1b2a; border:1px solid #1e3a5f; border-radius:8px; padding:10px; font-size:11px; }
-.cert-title { color:#ffca28; font-weight:700; margin-bottom:6px; }
-.cert-row { color:#b0bec5; margin:3px 0; }
-.cert-row span { color:#78909c; }
-.empty { text-align:center; padding:40px; color:#546e7a; }
-.empty .icon { font-size:40px; margin-bottom:10px; }
-.footer { text-align:center; padding:20px; font-size:11px; color:#546e7a; border-top:1px solid #1a2a4a; margin-top:20px; }
-.live { display:inline-block; width:8px; height:8px; background:#4caf50; border-radius:50%; margin-left:6px; animation: pulse 1.5s infinite; }
-@keyframes pulse { 0% { opacity:1; } 50% { opacity:0.4; } 100% { opacity:1; } }
+.btn-ghost { background:#1a2a4a; color:#90a4ae; border:1px solid #2a3a5a; }
+.tabs { display:flex; gap:6px; padding:12px 16px; overflow-x:auto; }
+.tab { padding:8px 16px; border-radius:20px; font-size:12px; font-weight:700; cursor:pointer; border:1px solid var(--border); background:var(--card); color:var(--muted); white-space:nowrap; }
+.tab.active { background:var(--accent); color:#060a1a; border-color:var(--accent); }
+.content { padding:16px; }
+.section-title { font-size:13px; color:var(--accent); margin:16px 0 10px; display:flex; align-items:center; gap:6px; font-weight:800; }
+.file-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap:10px; }
+.file-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px; position:relative; transition:0.2s; border-right:3px solid var(--accent); }
+.file-card:hover { border-color:#2a5a9a; transform:translateY(-2px); }
+.file-card.api { border-right-color:#29b6f6; }
+.file-card.auth { border-right-color:#ff7043; }
+.file-card.shop { border-right-color:#66bb6a; }
+.file-card.match { border-right-color:#ffca28; }
+.file-card.cdn { border-right-color:#ab47bc; }
+.file-head { display:flex; justify-content:space-between; align-items:start; gap:8px; }
+.file-icon { font-size:20px; }
+.file-name { font-weight:800; font-size:13px; color:var(--accent); word-break:break-all; }
+.file-time { font-size:10px; color:var(--muted); white-space:nowrap; }
+.file-meta { display:flex; gap:5px; flex-wrap:wrap; margin-top:8px; }
+.meta { font-size:10px; padding:3px 7px; border-radius:6px; background:#0a1433; border:1px solid #1e2a4a; color:#b0bec5; }
+.meta.tls13 { background:#0a2e1a; color:#69f0ae; border-color:#00c853; }
+.meta.tls12 { background:#0d2a5a; color:#82b1ff; border-color:#2962ff; }
+.meta.ok { background:#0a2e1a; color:#a5d6a7; }
+.meta.fail { background:#3a0a0a; color:#ef9a9a; }
+.decrypt { margin-top:10px; background:#070d26; border:1px solid #1e2a4a; border-radius:8px; padding:10px; }
+.decrypt-title { font-size:11px; color:var(--gold); font-weight:800; display:flex; align-items:center; gap:5px; margin-bottom:6px; }
+.decrypt-row { font-size:11px; color:#b0bec5; margin:4px 0; display:flex; justify-content:space-between; gap:10px; }
+.decrypt-row span { color:var(--muted); }
+.score { display:inline-block; padding:2px 6px; border-radius:4px; font-weight:800; font-size:10px; }
+.score-high { background:#00c853; color:#fff; }
+.score-mid { background:#ffab00; color:#000; }
+.group { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:12px; }
+.group-head { display:flex; justify-content:space-between; align-items:center; }
+.group-name { font-weight:800; color:var(--accent); }
+.group-count { background:var(--accent); color:#000; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:800; }
+.group-logs { margin-top:10px; display:grid; gap:6px; }
+.mini { background:#070d26; border:1px solid #1a2a4a; padding:8px; border-radius:6px; font-size:11px; display:flex; justify-content:space-between; }
+.empty { text-align:center; padding:50px 20px; color:var(--muted); }
+.empty .icon { font-size:42px; margin-bottom:12px; }
+.footer { text-align:center; padding:20px; font-size:11px; color:#546e7a; border-top:1px solid #0f1a33; margin-top:20px; }
 </style>
 </head>
 <body>
 <div class="header">
-  <h1>⚡ eFootball Traffic Analyzer <span class="live"></span></h1>
-  <p>وضع القراءة فقط — بدون تعديل — آمن من الحظر — فلتر eFootball فقط</p>
+  <div class="header-top">
+    <h1>⚡ eFootball Analyzer <span>v{{ version }} • {{ today }}</span> <span class="live-dot"></span></h1>
+    <div style="font-size:11px; color:#78909c;">{{ version_name }} • Africa/Algiers</div>
+  </div>
+  <p>نظام فك تشفير حديث + تنظيم ملفات + تحديث لحظي — قراءة فقط بدون تعديل — آمن من الحظر</p>
   <div class="badges">
-    <span class="badge badge-green">● READ-ONLY</span>
-    <span class="badge badge-blue">🔒 Certificate Info</span>
+    <span class="badge badge-green"><span class="live-dot" style="width:7px;height:7px"></span> READ-ONLY</span>
+    <span class="badge badge-blue">🔓 Modern Decrypt</span>
     <span class="badge badge-gold">🎮 eFootball Only</span>
-    <span class="badge badge-blue">📱 iPhone 13</span>
-    <span class="badge badge-green">☁️ Railway $0</span>
+    <span class="badge badge-purple">📁 Files Organized</span>
+    <span class="badge badge-green">🔄 Auto Update</span>
+    <span class="badge badge-blue">📱 iPhone 13 • {{ today }}</span>
   </div>
 </div>
 
 <div class="stats" id="stats">
-  <div class="stat-card"><div class="num" id="s-total">{{ stats.total }}</div><div class="label">إجمالي الاتصالات</div></div>
-  <div class="stat-card"><div class="num" id="s-ef" style="color:#66bb6a">{{ stats.efootball }}</div><div class="label">eFootball</div></div>
-  <div class="stat-card"><div class="num" id="s-stored">{{ stats.stored }}</div><div class="label">محفوظة (آخر 500)</div></div>
-  <div class="stat-card"><div class="num" id="s-filter" style="font-size:14px">{{ stats.filter }}</div><div class="label">الفلتر</div></div>
+  <div class="stat"><div class="num" id="s-total">{{ stats.total }}</div><div class="label">إجمالي الاتصالات</div></div>
+  <div class="stat"><div class="num" id="s-ef" style="color:var(--green)">{{ stats.efootball }}</div><div class="label">eFootball</div></div>
+  <div class="stat"><div class="num" id="s-stored">{{ stats.stored }}</div><div class="label">محفوظة (500)</div></div>
+  <div class="stat"><div class="num" id="s-hosts">{{ grouped.total_hosts if grouped else 0 }}</div><div class="label">عدد السيرفرات</div></div>
 </div>
 
 <div class="controls">
-  <button class="btn btn-primary" onclick="fetchLogs()">🔄 تحديث</button>
-  <button class="btn btn-danger" onclick="clearLogs()">🗑️ مسح السجل</button>
-  <button class="btn btn-secondary" onclick="toggleAuto() " id="autoBtn">⏸️ إيقاف التحديث التلقائي</button>
-  <span style="font-size:11px; color:#78909c; margin-right:10px; align-self:center;">تحديث تلقائي كل 3 ثواني</span>
+  <input id="search" placeholder="🔍 بحث في Host أو الحالة..." oninput="filterLogs()">
+  <button class="btn btn-primary" onclick="fetchAll()">🔄 تحديث الآن</button>
+  <button class="btn btn-success" onclick="exportLogs()">📥 تصدير JSON</button>
+  <button class="btn btn-danger" onclick="clearLogs()">🗑️ مسح</button>
+  <button class="btn btn-ghost" id="autoBtn" onclick="toggleAuto()">⏸️ إيقاف تلقائي</button>
+  <span id="updateInfo" style="font-size:11px; color:var(--muted);">تحديث كل 2 ثانية • {{ today }}</span>
 </div>
 
-<div class="logs" id="logs">
-  {% if logs %}
-    {% for log in logs %}
-    <div class="log-card efootball">
-      <div class="log-head">
-        <span class="log-host">{{ log.method }} {{ log.host }}:{{ log.port }}</span>
-        <span class="log-time">{{ log.time_str }} — {{ log.date_str }}</span>
-      </div>
-      <div class="log-meta">
-        <span class="meta ok">{{ log.status }}</span>
-        <span class="meta">⏱️ {{ log.duration_ms or 0 }}ms</span>
-        <span class="meta">🎮 eFootball</span>
-        <span class="meta">{{ log.target[:60] }}</span>
-      </div>
-      {% if log.cert_info %}
-      <div class="cert">
-        <div class="cert-title">🔒 معلومات الشهادة — {{ log.cert_info.host }}</div>
-        {% if log.cert_info.status == 'ok' %}
-          <div class="cert-row"><span>Subject:</span> {{ log.cert_info.subject }}</div>
-          <div class="cert-row"><span>Issuer:</span> {{ log.cert_info.issuer }}</div>
-          <div class="cert-row"><span>Valid:</span> {{ log.cert_info.notBefore }} → {{ log.cert_info.notAfter }}</div>
-          <div class="cert-row"><span>Status:</span> <span style="color:#81c784">✔️ صالحة</span></div>
-        {% else %}
-          <div class="cert-row"><span>Status:</span> <span style="color:#ef9a9a">{{ log.cert_info.status }} — {{ log.cert_info.error or '' }}</span></div>
-        {% endif %}
-      </div>
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('all')" id="tab-all">📋 كل السجلات</div>
+  <div class="tab" onclick="switchTab('files')" id="tab-files">📁 ملفات منظمة</div>
+  <div class="tab" onclick="switchTab('grouped')" id="tab-grouped">🗂️ حسب السيرفر</div>
+  <div class="tab" onclick="switchTab('certs')" id="tab-certs">🔒 الشهادات</div>
+</div>
+
+<div class="content">
+  <!-- ALL LOGS -->
+  <div id="view-all">
+    <div class="section-title">📄 السجلات — مرتبة زمنياً (الأحدث أولاً) — تحديث لحظي</div>
+    <div id="logs" class="file-grid">
+      {% if logs %}
+        {% for log in logs %}
+        <div class="file-card {{ log.category }}">
+          <div class="file-head">
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="file-icon">
+                {% if log.category == 'auth' %}🔐{% elif log.category == 'shop' %}🛒{% elif log.category == 'match' %}⚽{% elif log.category == 'api' %}🔌{% elif log.category == 'cdn' %}📦{% else %}📄{% endif %}
+              </span>
+              <div>
+                <div class="file-name">{{ log.method }} {{ log.clean_host }}</div>
+                <div style="font-size:10px; color:var(--muted);">{{ log.file_name }}</div>
+              </div>
+            </div>
+            <div class="file-time">{{ log.time_str }}<br>{{ log.date_str }}</div>
+          </div>
+          <div class="file-meta">
+            <span class="meta ok">{{ log.status }}</span>
+            <span class="meta">⏱️ {{ log.duration_ms or 0 }}ms</span>
+            <span class="meta">{{ log.category }}</span>
+            {% if log.tls_info and log.tls_info.tls_version %}
+              <span class="meta {{ 'tls13' if log.tls_info.tls_version == 'TLSv1.3' else 'tls12' }}">{{ log.tls_info.tls_version }}</span>
+              {% if log.tls_info.cipher %}<span class="meta">{{ log.tls_info.cipher.name[:20] }}</span>{% endif %}
+            {% endif %}
+          </div>
+          {% if log.tls_info %}
+          <div class="decrypt">
+            <div class="decrypt-title">🔓 فك تشفير حديث — {{ log.tls_info.host }} {% if log.tls_info.modern_score %}<span class="score {{ 'score-high' if log.tls_info.modern_score > 70 else 'score-mid' }}">{{ log.tls_info.modern_score }}/100</span>{% endif %}</div>
+            {% if log.tls_info.status == 'ok' %}
+              <div class="decrypt-row"><span>TLS:</span> <b>{{ log.tls_info.tls_version }} {% if log.tls_info.cipher %}• {{ log.tls_info.cipher.bits }}bit{% endif %}</b></div>
+              <div class="decrypt-row"><span>SNI:</span> {{ log.tls_info.sni }}</div>
+              {% if log.tls_info.cert %}
+                <div class="decrypt-row"><span>Issuer:</span> {{ log.tls_info.cert.issuer[:35] }}</div>
+                <div class="decrypt-row"><span>Valid:</span> {{ log.tls_info.cert.notBefore[:16] }} → {{ log.tls_info.cert.notAfter[:16] }}</div>
+              {% endif %}
+            {% else %}
+              <div class="decrypt-row"><span>Status:</span> {{ log.tls_info.status }} {{ log.tls_info.error or '' }}</div>
+            {% endif %}
+          </div>
+          {% elif log.cert_info %}
+          <div class="decrypt">
+            <div class="decrypt-title">🔒 معلومات الشهادة — {{ log.cert_info.host if log.cert_info.host else log.host }}</div>
+            <div class="decrypt-row"><span>Issuer:</span> {{ log.cert_info.issuer[:40] if log.cert_info.issuer else '' }}</div>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty" style="grid-column:1/-1;">
+          <div class="icon">📡</div>
+          <div>لا يوجد ترافيك eFootball بعد — {{ today }}</div>
+          <div style="font-size:12px; margin-top:8px;">اضبط iPhone على البروكسي ثم افتح eFootball</div>
+        </div>
       {% endif %}
     </div>
-    {% endfor %}
-  {% else %}
-    <div class="empty">
-      <div class="icon">📡</div>
-      <div>لا يوجد ترافيك eFootball بعد</div>
-      <div style="font-size:12px; margin-top:8px; color:#78909c;">اضبط iPhone على البروكسي ثم افتح eFootball — ستظهر الاتصالات هنا لحظياً</div>
-      <div style="font-size:11px; margin-top:12px; background:#111a33; display:inline-block; padding:8px 12px; border-radius:8px; border:1px solid #1e3a5f;">
-        الإعدادات > Wi-Fi > ⓘ > تكوين البروكسي > يدوي<br>
-        الخادم: <b style="color:#4fc3f7">xxx.up.railway.app</b> — المنفذ: <b style="color:#4fc3f7">{{ request.headers.get('host','') }}</b>
-      </div>
-    </div>
-  {% endif %}
+  </div>
+
+  <!-- FILES VIEW -->
+  <div id="view-files" style="display:none;">
+    <div class="section-title">📁 ملفات منظمة — كل اتصال كملف</div>
+    <div id="files" class="file-grid"></div>
+  </div>
+
+  <!-- GROUPED VIEW -->
+  <div id="view-grouped" style="display:none;">
+    <div class="section-title">🗂️ مجمع حسب السيرفر — يحدث تلقائياً</div>
+    <div id="grouped"></div>
+  </div>
+
+  <!-- CERTS VIEW -->
+  <div id="view-certs" style="display:none;">
+    <div class="section-title">🔒 الشهادات — فك تشفير حديث</div>
+    <div id="certs" class="file-grid"></div>
+  </div>
 </div>
 
 <div class="footer">
-  eFootball Traffic Analyzer v3.0 — وضع القراءة فقط — لا يعدل أي بايت — آمن من الحظر<br>
-  يعمل على Railway • فلتر eFootball فقط • معلومات الشهادة لكل اتصال
+  eFootball Traffic Analyzer v{{ version }} — {{ version_name }} — {{ today }} • Africa/Algiers<br>
+  Modern Decryption (TLS 1.3 + SNI + Cipher) • ملفات منظمة • تحديث لحظي كل 2 ثانية • READ-ONLY آمن
 </div>
 
 <script>
 let auto = true;
-let timer = setInterval(fetchLogs, 3000);
+let timer = setInterval(fetchAll, 2000);
+let currentTab = 'all';
 
-async function fetchLogs() {
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.querySelectorAll('[id^="view-"]').forEach(v=>v.style.display='none');
+  document.getElementById('view-'+tab).style.display='block';
+  if(tab!=='all') fetchAll();
+}
+
+async function fetchAll() {
   try {
-    const r = await fetch('/api/logs?limit=50');
-    const j = await r.json();
-    document.getElementById('s-total').textContent = j.stats.total;
-    document.getElementById('s-ef').textContent = j.stats.efootball;
-    document.getElementById('s-stored').textContent = j.stats.stored;
-    
-    const container = document.getElementById('logs');
-    if (j.logs.length === 0) {
-      container.innerHTML = `<div class="empty"><div class="icon">📡</div><div>لا يوجد ترافيك eFootball بعد</div><div style="font-size:12px; margin-top:8px; color:#78909c;">افتح eFootball على الآيفون المتصل بالبروكسي</div></div>`;
-      return;
-    }
-    container.innerHTML = j.logs.map(log => `
-      <div class="log-card efootball">
-        <div class="log-head">
-          <span class="log-host">${log.method} ${log.host}:${log.port}</span>
-          <span class="log-time">${log.time_str} — ${log.date_str}</span>
+    const [logsRes, filesRes] = await Promise.all([
+      fetch('/api/logs?limit=50').then(r=>r.json()),
+      fetch('/api/files').then(r=>r.json())
+    ]);
+    updateStats(logsRes.stats);
+    if(currentTab==='all') renderLogs(logsRes.logs);
+    if(currentTab==='files') renderFiles(filesRes.files);
+    if(currentTab==='grouped') renderGrouped(filesRes.grouped);
+    if(currentTab==='certs') renderCerts(logsRes.logs);
+    // also update hidden views for instant switch
+    if(currentTab!=='files') _cacheFiles = filesRes.files;
+    if(currentTab!=='grouped') _cacheGrouped = filesRes.grouped;
+  } catch(e){ console.log(e); }
+}
+
+let _cacheFiles=[], _cacheGrouped={};
+
+function updateStats(s) {
+  document.getElementById('s-total').textContent = s.total;
+  document.getElementById('s-ef').textContent = s.efootball;
+  document.getElementById('s-stored').textContent = s.stored;
+  if(document.getElementById('s-hosts')) document.getElementById('s-hosts').textContent = s.by_host ? Object.keys(s.by_host).length : 0;
+  document.getElementById('updateInfo').textContent = 'آخر تحديث: ' + new Date().toLocaleTimeString('ar-DZ') + ' • {{ today }}';
+}
+
+function renderLogs(logs) {
+  const c = document.getElementById('logs');
+  if(!logs.length) { c.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="icon">📡</div><div>لا يوجد ترافيك</div></div>`; return; }
+  c.innerHTML = logs.map(log => fileCard(log)).join('');
+}
+
+function renderFiles(files) {
+  const c = document.getElementById('files');
+  files = files || _cacheFiles;
+  if(!files.length) { c.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="icon">📁</div><div>لا ملفات</div></div>`; return; }
+  c.innerHTML = files.map(f => `
+    <div class="file-card ${f.category}">
+      <div class="file-head"><span class="file-icon">📄</span><span class="file-name">${f.file_name}</span><span class="file-time">${f.time}<br>${f.date}</span></div>
+      <div class="file-meta"><span class="meta">${f.category}</span><span class="meta">${f.host}</span><span class="meta">${f.status}</span></div>
+    </div>
+  `).join('');
+}
+
+function renderGrouped(grouped) {
+  grouped = grouped || _cacheGrouped;
+  const c = document.getElementById('grouped');
+  if(!grouped || !grouped.by_host) { c.innerHTML = `<div class="empty"><div class="icon">🗂️</div><div>لا مجموعات</div></div>`; return; }
+  let html = '';
+  for(const [host, data] of Object.entries(grouped.by_host)) {
+    html += `<div class="group"><div class="group-head"><span class="group-name">📁 ${host}</span><span class="group-count">${data.count} ملفات</span></div><div style="font-size:11px; color:var(--muted);">${data.category} • آخر 5</div><div class="group-logs">${data.logs.map(l=>`<div class="mini"><span>${l.method} ${l.time_str} • ${l.status}</span><span>${l.duration_ms}ms</span></div>`).join('')}</div></div>`;
+  }
+  c.innerHTML = html || `<div class="empty"><div class="icon">🗂️</div><div>لا سيرفرات</div></div>`;
+}
+
+function renderCerts(logs) {
+  const c = document.getElementById('certs');
+  const withCert = logs.filter(l=>l.tls_info || l.cert_info);
+  if(!withCert.length) { c.innerHTML = `<div class="empty" style="grid-column:1/-1;"><div class="icon">🔒</div><div>لا شهادات بعد</div></div>`; return; }
+  c.innerHTML = withCert.map(log => {
+    const t = log.tls_info;
+    return `<div class="file-card"><div class="decrypt"><div class="decrypt-title">🔒 ${t ? t.host : log.host} ${t && t.modern_score ? `<span class="score ${t.modern_score>70?'score-high':'score-mid'}">${t.modern_score}/100</span>` : ''}</div>${t ? `<div class="decrypt-row"><span>TLS:</span> ${t.tls_version} • ${t.cipher ? t.cipher.name : ''}</div><div class="decrypt-row"><span>SNI:</span> ${t.sni}</div>${t.cert ? `<div class="decrypt-row"><span>Issuer:</span> ${t.cert.issuer.slice(0,40)}</div><div class="decrypt-row"><span>Valid:</span> ${t.cert.notBefore.slice(0,16)} → ${t.cert.notAfter.slice(0,16)}</div>` : ''}` : `<div class="decrypt-row"><span>Issuer:</span> ${log.cert_info.issuer||''}</div>`}</div></div>`;
+  }).join('');
+}
+
+function fileCard(log) {
+  const icon = log.category==='auth'?'🔐':log.category==='shop'?'🛒':log.category==='match'?'⚽':log.category==='api'?'🔌':log.category==='cdn'?'📦':'📄';
+  const tlsBadge = log.tls_info && log.tls_info.tls_version ? `<span class="meta ${log.tls_info.tls_version==='TLSv1.3'?'tls13':'tls12'}">${log.tls_info.tls_version}</span>` : '';
+  const cipher = log.tls_info && log.tls_info.cipher ? `<span class="meta">${log.tls_info.cipher.name.slice(0,18)}</span>` : '';
+  const score = log.tls_info && log.tls_info.modern_score ? `<span class="score ${log.tls_info.modern_score>70?'score-high':'score-mid'}">${log.tls_info.modern_score}/100</span>` : '';
+  const decrypt = log.tls_info ? `
+    <div class="decrypt">
+      <div class="decrypt-title">🔓 فك تشفير حديث — ${log.tls_info.host} ${score}</div>
+      ${log.tls_info.status==='ok' ? `
+        <div class="decrypt-row"><span>TLS:</span> <b>${log.tls_info.tls_version} ${log.tls_info.cipher ? '• '+log.tls_info.cipher.bits+'bit' : ''}</b></div>
+        <div class="decrypt-row"><span>SNI:</span> ${log.tls_info.sni}</div>
+        ${log.tls_info.cert ? `<div class="decrypt-row"><span>Issuer:</span> ${log.tls_info.cert.issuer.slice(0,35)}</div><div class="decrypt-row"><span>Valid:</span> ${log.tls_info.cert.notBefore.slice(0,16)} → ${log.tls_info.cert.notAfter.slice(0,16)}</div>` : ''}
+      ` : `<div class="decrypt-row"><span>Status:</span> ${log.tls_info.status} ${log.tls_info.error||''}</div>`}
+    </div>` : (log.cert_info ? `<div class="decrypt"><div class="decrypt-title">🔒 ${log.cert_info.host||log.host}</div><div class="decrypt-row"><span>Issuer:</span> ${(log.cert_info.issuer||'').slice(0,40)}</div></div>` : '');
+  return `
+    <div class="file-card ${log.category}">
+      <div class="file-head">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <span class="file-icon">${icon}</span>
+          <div><div class="file-name">${log.method} ${log.clean_host || log.host}</div><div style="font-size:10px; color:var(--muted);">${log.file_name || log.id+'.log'}</div></div>
         </div>
-        <div class="log-meta">
-          <span class="meta ok">${log.status}</span>
-          <span class="meta">⏱️ ${log.duration_ms||0}ms</span>
-          <span class="meta">🎮 eFootball</span>
-          <span class="meta" style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${log.target}</span>
-        </div>
-        ${log.cert_info ? `
-        <div class="cert">
-          <div class="cert-title">🔒 ${log.cert_info.host}</div>
-          ${log.cert_info.status==='ok' ? `
-            <div class="cert-row"><span>Subject:</span> ${log.cert_info.subject}</div>
-            <div class="cert-row"><span>Issuer:</span> ${log.cert_info.issuer}</div>
-            <div class="cert-row"><span>Valid:</span> ${log.cert_info.notBefore} → ${log.cert_info.notAfter}</div>
-          ` : `<div class="cert-row"><span>Status:</span> ${log.cert_info.status} ${log.cert_info.error||''}</div>`}
-        </div>` : ''}
+        <div class="file-time">${log.time_str}<br>${log.date_str}</div>
       </div>
-    `).join('');
-  } catch(e) { console.log(e); }
+      <div class="file-meta"><span class="meta ok">${log.status}</span><span class="meta">⏱️ ${log.duration_ms||0}ms</span><span class="meta">${log.category}</span>${tlsBadge}${cipher}</div>
+      ${decrypt}
+    </div>
+  `;
+}
+
+function filterLogs() {
+  const q = document.getElementById('search').value.toLowerCase();
+  if(!q) { fetchAll(); return; }
+  fetch('/api/logs?limit=100&search='+encodeURIComponent(q)).then(r=>r.json()).then(j=>{
+    renderLogs(j.logs);
+    updateStats(j.stats);
+  });
 }
 
 async function clearLogs() {
   if(!confirm('مسح كل السجلات؟')) return;
   await fetch('/api/clear', {method:'POST'});
-  fetchLogs();
+  fetchAll();
+}
+
+async function exportLogs() {
+  const r = await fetch('/api/export');
+  const j = await r.json();
+  const blob = new Blob([JSON.stringify(j,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `efootball_${j.export_date}.json`;
+  a.click();
 }
 
 function toggleAuto() {
   auto = !auto;
   const btn = document.getElementById('autoBtn');
-  if(auto) {
-    timer = setInterval(fetchLogs, 3000);
-    btn.textContent = '⏸️ إيقاف التحديث التلقائي';
-  } else {
-    clearInterval(timer);
-    btn.textContent = '▶️ تشغيل التحديث التلقائي';
-  }
+  if(auto) { timer=setInterval(fetchAll,2000); btn.textContent='⏸️ إيقاف تلقائي'; }
+  else { clearInterval(timer); btn.textContent='▶️ تشغيل تلقائي'; }
 }
+
+// تحديث فوري عند التحميل
+fetchAll();
 </script>
 </body>
 </html>
