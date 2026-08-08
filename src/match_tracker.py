@@ -75,6 +75,8 @@ class MatchTracker:
         self.phase = PHASE_IDLE
         self.phase_since: float | None = None
         self.session_start: float | None = None
+        # وقت بدء آخر جلسة مباراة فعلية (يتحدث عند kickoff فقط) — لأساس مؤقّت المباراة
+        self.session_kickoff_at: float | None = None
         self.connections = 0
         self.server_bytes = 0
         self.client_bytes = 0
@@ -118,6 +120,7 @@ class MatchTracker:
                 self.phase = PHASE_KICKOFF
                 self.phase_since = now
                 self.session_start = now
+                self.session_kickoff_at = now
                 self.connections = 0
                 self.server_bytes = 0
                 self.client_bytes = 0
@@ -260,6 +263,12 @@ class MatchTracker:
                 "session_seconds": (
                     round(self._now() - self.session_start, 1)
                     if self.session_start is not None
+                    else 0
+                ),
+                "session_kickoff_at": self.session_kickoff_at,
+                "match_seconds": (
+                    round(self._now() - self.session_kickoff_at, 1)
+                    if self.session_kickoff_at is not None
                     else 0
                 ),
                 "connections": self.connections,

@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import DATA_DIR
-from .ai_analyzer import AI_HOSTS
+from .ai_analyzer import AI_HOSTS, is_ai_file
 
 DATA_FILE = Path(
     os.environ.get("NETCTL_FILE", str(Path(DATA_DIR) / "netctl.json"))
@@ -44,8 +44,15 @@ _settings: dict[str, Any] = {
     "throttle_kbps": 0,
     "block_hosts": [],
     "result_guard": False,
+    "result_guard_scope": "offline",   # "offline" (موصى به) أو "all"
+    "block_matchmaking": False,
+    "auto_finish_sec": 0,              # 0 = مؤقّت المباراة متوقف
+    "jitter_ms": 0,                    # 0 = بدون تأخير عشوائي
     "finish_cooldown_sec": 120,
 }
+
+# كلمات دالة على نطاقات المطابقة/البحث عن الخصم (تخمين — ليست بروتوكولاً موثقاً)
+MATCHMAKING_KEYWORDS = ("match", "lobby", "queue", "search", "battle", "room", "mm")
 
 # حجب مؤقت (منع إعادة الاتصال بعد إنهاء المباراة) — host -> حتى (timestamp)
 _temp_blocks: dict[str, float] = {}
@@ -72,6 +79,22 @@ def _normalize(bundle: Mapping[str, Any] | None) -> dict[str, Any]:
     except (TypeError, ValueError):
         cooldown = 120
 
+    auto_finish = bundle.get("auto_finish_sec", 0)
+    try:
+        auto_finish = max(0, min(3600, int(auto_finish)))
+    except (TypeError, ValueError):
+        auto_finish = 0
+
+    jitter = bundle.get("jitter_ms", 0)
+    try:
+        jitter = max(0, min(2000, int(jitter)))
+    except (TypeError, ValueError):
+        jitter = 0
+
+    scope = bundle.get("result_guard_scope", "offline")
+    if scope not in ("offline", "all"):
+        scope = "offline"
+
     block_hosts = bundle.get("block_hosts", [])
     if not isinstance(block_hosts, list):
         block_hosts = []
@@ -85,6 +108,10 @@ def _normalize(bundle: Mapping[str, Any] | None) -> dict[str, Any]:
         "throttle_kbps": throttle,
         "block_hosts": cleaned[:50],
         "result_guard": bundle.get("result_guard") is True,
+        "result_guard_scope": scope,
+        "block_matchmaking": bundle.get("block_matchmaking") is True,
+        "auto_finish_sec": auto_finish,
+        "jitter_ms": jitter,
         "finish_cooldown_sec": cooldown,
         "updated_at": bundle.get("updated_at"),
     }
@@ -130,7 +157,9 @@ def save_settings(values: Mapping[str, Any]) -> dict[str, Any]:
             "⚙️ تغيير إعدادات الشبكة",
             f"تحديد سرعة: {current['throttle_kbps']}KB/s • حجب: {len(current['block_hosts'])} نطاق • "
             f"منع رفع النتيجة: {'نشط' if current['result_guard'] else 'متوقف'} • "
-            f"كولداون الإنهاء: {current['finish_cooldown_sec']}ث",
+            f"مانع المطابقة: {'نشط' if current['block_matchmaking'] else 'متوقف'} • "
+            f"مؤقّت المباراة: {current['auto_finish_sec']}ث • "
+            f"Jitter: {current['jitter_ms']}ms",
         )
         return dict(current)
 
@@ -152,20 +181,78 @@ def _clean_host(host: str) -> str:
     return value
 
 
-def should_block(host: str) -> bool:
-    """هل النطاق ممنوع؟ قائمة الحظر الثابتة + الحجب المؤقت (كولداون الإنهاء)."""
-    if not host:
+def is_matchmaking_host(host: str) -> bool:
+    """تخمين: هل النطاق يخص المطابقة/البحث عن الخصم؟
+
+    يستخدم كلمات دالة شائعة (match/lobby/queue/search/...) داخل أسماء
+    المضيفات. يُستثنى خادم بيانات AI حتى لا يقطع المزامنة الآفلانية.
+    هذه قاعدة تخمينية — ليست قائمة نطاقات KONAMI موثقة.
+    """
+    value = _clean_host(host)
+    if not value or is_ai_file(value):
         return False
+    hostname = value.rsplit(".", 1)[0] if "." in value else value
+    return any(keyword in hostname for keyword in MATCHMAKING_KEYWORDS)
+
+
+def block_reason(host: str) -> str | None:
+    """سبب منع الاتصال إن وُجد: كولداون الإنهاء / قائمة الحظر / مانع المطابقة."""
+    if not host:
+        return None
     value = _clean_host(host)
     now = _now()
     with _lock:
         until = _temp_blocks.get(value)
         if until is not None:
             if until > now:
-                return True
+                return "cooldown_finish"
             _temp_blocks.pop(value, None)
         rules = _settings.get("block_hosts", [])
-    return any(value == rule or value.endswith("." + rule) for rule in rules)
+        matchmaking = _settings.get("block_matchmaking", False)
+    if any(value == rule or value.endswith("." + rule) for rule in rules):
+        return "blocklist"
+    if matchmaking and is_matchmaking_host(value):
+        return "matchmaking"
+    return None
+
+
+def should_block(host: str) -> bool:
+    return block_reason(host) is not None
+
+
+def jitter_ms() -> int:
+    with _lock:
+        return int(_settings.get("jitter_ms", 0))
+
+
+def auto_finish_sec() -> int:
+    with _lock:
+        return int(_settings.get("auto_finish_sec", 0))
+
+
+def auto_finish_due(session_start: float | None, now: float | None = None) -> bool:
+    """هل انقضت مدة مؤقّت المباراة؟ (0 = المؤقّت متوقف)."""
+    limit = auto_finish_sec()
+    if limit <= 0 or not session_start:
+        return False
+    return (_now() if now is None else now) - session_start >= limit
+
+
+def result_guard_applies(host: str, phase: str, mode: str) -> bool:
+    """هل يسقط منع رفع النتيجة هذا الاتصال؟
+
+    - يجب أن يكون منع رفع النتيجة مفعّلاً + الطور ``full_time`` + مضيف AI.
+    - ``result_guard_scope``: ``offline`` (موصى به) = فقط عندما تكون
+      الجلسة مصنّفة ``offline_ai``؛ ``all`` = أي جلسة.
+    """
+    if not _settings.get("result_guard"):
+        return False
+    if phase != "full_time" or not is_ai_file(host):
+        return False
+    scope = _settings.get("result_guard_scope", "offline")
+    if scope == "offline":
+        return mode == "offline_ai"
+    return True
 
 
 def temp_blocks() -> list[dict[str, Any]]:

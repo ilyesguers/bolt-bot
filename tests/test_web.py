@@ -148,6 +148,32 @@ class FeatureAPITests(unittest.TestCase):
         self.assertEqual(kill.status_code, 200)
         self.assertIn("killed", kill.json())
 
+    def test_menu_endpoint_lists_features_and_settings(self):
+        response = self.client.get("/menu")
+        self.assertEqual(response.status_code, 200)
+        text = response.text
+        self.assertIn("eFootball Proxy Menu", text)
+        self.assertIn("مانع المطابقة", text)
+        self.assertIn("مؤقّت المباراة", text)
+        self.assertIn("إنهاء المباراة", text)
+        self.assertIn("/api/netctl", text)
+
+    def test_netctl_new_settings_validation(self):
+        ok = self.client.post(
+            "/api/netctl",
+            json={"settings": {"block_matchmaking": True, "auto_finish_sec": 90, "jitter_ms": 300, "result_guard_scope": "all"}},
+        )
+        self.assertEqual(ok.status_code, 200)
+        self.assertTrue(ok.json()["settings"]["block_matchmaking"])
+        self.assertEqual(ok.json()["settings"]["auto_finish_sec"], 90)
+
+        bad = self.client.post("/api/netctl", json={"settings": {"auto_finish_sec": -1}})
+        self.assertEqual(bad.status_code, 422)
+        bad = self.client.post("/api/netctl", json={"settings": {"jitter_ms": 5000}})
+        self.assertEqual(bad.status_code, 422)
+        bad = self.client.post("/api/netctl", json={"settings": {"result_guard_scope": "bogus"}})
+        self.assertEqual(bad.status_code, 422)
+
     def test_finish_match_endpoint(self):
         result = self.client.post(
             "/api/netctl/finish", json={"cooldown_sec": 60}

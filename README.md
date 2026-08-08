@@ -1,17 +1,34 @@
-# ⚡ eFootball Traffic Analyzer — v5.5
+# ⚡ eFootball Traffic Analyzer — v5.6
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-5.5.0-00E676?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-5.6.0-00E676?style=for-the-badge)
 ![Build](https://img.shields.io/badge/build-passing-2962FF?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-Railway%20%7C%20iPhone%2013-0A1433?style=for-the-badge)
 ![Date](https://img.shields.io/badge/date-2026--08--08-FFCA28?style=for-the-badge)
 
-**Proxy passthrough + Dashboard + AI-host traffic metadata + Feature Engine (target/timing) + Live Match Phase + Real Notifications + Proxy-Only Network Controls + Instant Match Finish**
+**Proxy passthrough + Dashboard + AI-host traffic metadata + Feature Engine (target/timing) + Live Match Phase + Real Notifications + Proxy-Only Network Controls + Instant Match Finish + Matchmaking Blocker + Match Timer + Proxy Text Menu**
 
 </div>
 
 ---
+
+## ما الجديد في v5.6 — باقي كتالوج التحكم + مينو البروكسي
+
+- **🚫 مانع المطابقة**: حجب نطاقات البحث عن الخصم (تخمين بالكلمات:
+  `match/lobby/queue/search/...`) → اللعبة تبقى "تلفشش" في البحث وأنت تلعب
+  آفلان فقط بدون عقوبات. يُستثنى خادم بيانات AI حتى لا يقطع المزامنة.
+- **⏰ مؤقّت المباراة**: `auto_finish_sec` — بعد انقضاء المدة من بداية
+  الجلسة ينهي البروكسي المباراة تلقائياً (قطع + منع عودة). قطع أعمى
+  (لا يرى النتيجة).
+- **📉 Jitter**: تأخير عشوائي (0-2000ms) على الحزم في الاتجاهين —
+  موصوف بوضوح بأنه يؤثر عليك أنت أيضاً ولا يُنصح به.
+- **🛑 نطاق منع رفع النتيجة**: `result_guard_scope` = `offline` (موصى به:
+  يسقط فقط جلسات "آفلان ضد AI") أو `all`.
+- **📄 مينو نصي للبروكسي**: `GET /menu` يعرض كل الميزات + حالتها +
+  أوامر curl للتفعيل — **لا تحتاج الموقع** للتحكم.
+- **الشفافية**: كل حجب يسجّل سببه (قائمة حظر / مانع مطابقة / منع عودة)
+  في السجل والإشعارات.
 
 ## ما الجديد في v5.5 — ⚡ إنهاء المباراة الآن (حقيقي)
 
@@ -146,8 +163,9 @@ python -m src.main
 | `GET /api/modmenu` | تعريفات المود مينو وحالته |
 | `POST /api/modmenu` | حفظ مفاتيح المود مينو (`{"features":{...}}`) |
 | `GET /api/modmenu/config` | صيغة خفيفة للتطبيق المعدّل (dylib) |
+| `GET /menu` | 📄 مينو نصي للبروكسي (كل الميزات + الحالة + أوامر curl) |
 | `GET /api/netctl` | إعدادات التحكم الشبكي + الجلسات + سجل الإجراءات + الحجب المؤقت |
-| `POST /api/netctl` | حفظ إعدادات التحكم الشبكي |
+| `POST /api/netctl` | حفظ إعدادات التحكم الشبكي (بما فيها `block_matchmaking`، `auto_finish_sec`، `jitter_ms`، `result_guard_scope`) |
 | `POST /api/netctl/kill` | قطع كل الاتصالات النشطة |
 | `POST /api/netctl/finish` | ⚡ إنهاء المباراة + منع العودة `{"cooldown_sec":120}` |
 | `WS /ws/live` | تحديثات مباشرة (إحصائيات + سجلات + إشعارات + طور/نمط المباراة + حجب مؤقت) |

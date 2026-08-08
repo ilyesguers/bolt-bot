@@ -147,6 +147,56 @@ class NetCtlTests(unittest.TestCase):
         netctl._now = time.time
         netctl._temp_blocks.clear()
 
+    def test_matchmaking_detection_and_block(self):
+        netctl.save_settings({"block_matchmaking": True})
+        self.assertTrue(netctl.is_matchmaking_host("match.konami.net"))
+        self.assertTrue(netctl.is_matchmaking_host("lobby-2.konami.net:443"))
+        self.assertTrue(netctl.should_block("match.konami.net"))
+        self.assertEqual(netctl.block_reason("match.konami.net"), "matchmaking")
+        # خادم بيانات AI لا يُحجب أبداً بمانع المطابقة
+        self.assertFalse(netctl.is_matchmaking_host("pes22-game.cs.konami.net"))
+        self.assertEqual(netctl.block_reason("pes22-game.cs.konami.net"), None)
+
+        netctl.save_settings({"block_matchmaking": False})
+        self.assertFalse(netctl.should_block("match.konami.net"))
+        self.assertEqual(netctl.block_reason("match.konami.net"), None)
+
+    def test_new_settings_normalized(self):
+        saved = netctl.save_settings(
+            {"auto_finish_sec": "180", "jitter_ms": 500, "result_guard_scope": "all"}
+        )
+        self.assertEqual(saved["auto_finish_sec"], 180)
+        self.assertEqual(saved["jitter_ms"], 500)
+        self.assertEqual(saved["result_guard_scope"], "all")
+        # حدود
+        saved = netctl.save_settings({"auto_finish_sec": 99999, "jitter_ms": -3, "result_guard_scope": "bogus"})
+        self.assertEqual(saved["auto_finish_sec"], 3600)
+        self.assertEqual(saved["jitter_ms"], 0)
+        self.assertEqual(saved["result_guard_scope"], "offline")
+
+    def test_auto_finish_due(self):
+        clock = {"t": 1000.0}
+        netctl._now = lambda: clock["t"]
+        netctl.save_settings({"auto_finish_sec": 90})
+        self.assertFalse(netctl.auto_finish_due(950.0))
+        self.assertTrue(netctl.auto_finish_due(900.0))
+        netctl.save_settings({"auto_finish_sec": 0})
+        self.assertFalse(netctl.auto_finish_due(900.0))
+        netctl._now = time.time
+
+    def test_result_guard_scope(self):
+        netctl.save_settings({"result_guard": True, "result_guard_scope": "offline"})
+        self.assertTrue(netctl.result_guard_applies("pes22-game.cs.konami.net", "full_time", "offline_ai"))
+        self.assertFalse(netctl.result_guard_applies("pes22-game.cs.konami.net", "full_time", "online"))
+        self.assertFalse(netctl.result_guard_applies("pes22-game.cs.konami.net", "first_half", "offline_ai"))
+        self.assertFalse(netctl.result_guard_applies("other.host", "full_time", "offline_ai"))
+
+        netctl.save_settings({"result_guard": True, "result_guard_scope": "all"})
+        self.assertTrue(netctl.result_guard_applies("pes22-game.cs.konami.net", "full_time", "online"))
+
+        netctl.save_settings({"result_guard": False, "result_guard_scope": "all"})
+        self.assertFalse(netctl.result_guard_applies("pes22-game.cs.konami.net", "full_time", "online"))
+
 
 if __name__ == "__main__":
     unittest.main()

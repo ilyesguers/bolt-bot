@@ -28,6 +28,7 @@ from .netctl import (
     save_settings as save_netctl,
     temp_blocks,
 )
+from .features import FEATURES as AI_FEATURES
 from .modmenu import FEATURES as MODMENU_FEATURES
 from .modmenu import config_payload, get_enabled as get_modmenu_enabled
 from .modmenu import load_config, save_config as save_modmenu
@@ -370,6 +371,28 @@ async def api_netctl_update(request: Request, auth=Depends(check_auth)):
     if "result_guard" in values and type(values["result_guard"]) is not bool:
         raise HTTPException(status_code=422, detail="result_guard يجب أن يكون true/false")
 
+    if "result_guard_scope" in values and values["result_guard_scope"] not in ("offline", "all"):
+        raise HTTPException(status_code=422, detail="result_guard_scope يجب أن يكون offline أو all")
+
+    if "block_matchmaking" in values and type(values["block_matchmaking"]) is not bool:
+        raise HTTPException(status_code=422, detail="block_matchmaking يجب أن يكون true/false")
+
+    if "auto_finish_sec" in values:
+        try:
+            auto_finish = int(values["auto_finish_sec"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="auto_finish_sec يجب أن يكون رقماً")
+        if not (0 <= auto_finish <= 3600):
+            raise HTTPException(status_code=422, detail="auto_finish_sec بين 0 و 3600")
+
+    if "jitter_ms" in values:
+        try:
+            jitter = int(values["jitter_ms"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="jitter_ms يجب أن يكون رقماً")
+        if not (0 <= jitter <= 2000):
+            raise HTTPException(status_code=422, detail="jitter_ms بين 0 و 2000")
+
     saved = save_netctl(values)
     add_notification(
         "🎛️ حُدّثت إعدادات التحكم الشبكي",
@@ -428,6 +451,73 @@ async def api_netctl_finish(request: Request, auth=Depends(check_auth)):
         "sessions": active_sessions(),
         "match": tracker.snapshot(),
     }
+
+
+def _menu_text() -> str:
+    """مينو نصي للبروكسي — نفس الموقع بدون واجهة رسومية."""
+    settings = load_settings()
+    match = tracker.snapshot()
+    ai_state = load_features()
+    lines: list[str] = []
+
+    lines.append("=" * 46)
+    lines.append(f"⚡ eFootball Proxy Menu — v{VERSION}")
+    lines.append(f"   {VERSION_NAME}")
+    lines.append(f"   {TODAY} • الوضع: {match['mode_label']} • الطور: {match['phase_label']}")
+    lines.append("=" * 46)
+
+    lines.append("\n[1] تحكم الشبكة (يعمل عبر البروكسي مباشرة):")
+    on_off = lambda v: "ON" if v else "OFF"
+    lines.append(f"    🔌 قطع كل الاتصالات ....................: زر اللوحة أو POST /api/netctl/kill")
+    lines.append(f"    ⚡ إنهاء المباراة ......................: POST /api/netctl/finish")
+    lines.append(f"    🛡️  منع رفع النتيجة ....................: {on_off(settings['result_guard'])} (النطاق: {settings['result_guard_scope']})")
+    lines.append(f"    🚫 مانع المطابقة .......................: {on_off(settings['block_matchmaking'])}")
+    lines.append(f"    ⏰ مؤقّت المباراة ......................: {settings['auto_finish_sec']} ثانية ({'متوقف' if not settings['auto_finish_sec'] else 'نشط'})")
+    lines.append(f"    🐌 تحديد السرعة ........................: {settings['throttle_kbps']} KB/s")
+    lines.append(f"    📉 Jitter (تأخير عشوائي) ...............: {settings['jitter_ms']} ms")
+    lines.append(f"    📋 قائمة الحظر .........................: {len(settings['block_hosts'])} نطاق")
+    lines.append(f"    ⛔ منع العودة بعد الإنهاء ..............: {settings['finish_cooldown_sec']} ثانية")
+
+    lines.append("\n[2] ميزات AI (تفضيلات — الرصد يعمل، التعديل محجوب على TLS):")
+    for key, meta in AI_FEATURES.items():
+        status = "ON " if ai_state.get(key) else "OFF"
+        lines.append(f"    {status}  {meta['name']}")
+
+    blocks = temp_blocks()
+    lines.append("\n[3] الحجب المؤقت الحالي:")
+    if blocks:
+        for b in blocks:
+            lines.append(f"    ⛔ {b['host']} — {int(b['remaining'])} ثانية متبقية")
+    else:
+        lines.append("    لا شيء")
+
+    sessions = active_sessions()
+    lines.append("\n[4] اتصالات نشطة:")
+    if sessions:
+        for s in sessions:
+            lines.append(f"    🔗 {s['host']} ({int(s['age_sec'])} ث)")
+    else:
+        lines.append("    لا شيء")
+
+    lines.append("\n[5] الإشعارات الأخيرة:")
+    for item in get_notifications()[:5]:
+        lines.append(f"    [{item['level']}] {item['msg']} ({item['time']})")
+
+    lines.append("\n" + "=" * 46)
+    lines.append("لتغيير أي إعداد عبر curl (بدون الموقع):")
+    lines.append("  POST /api/netctl  {\"settings\":{\"block_matchmaking\":true}}")
+    lines.append("  POST /api/netctl  {\"settings\":{\"auto_finish_sec\":180}}")
+    lines.append("  POST /api/netctl/finish  {\"cooldown_sec\":120}")
+    lines.append("  POST /api/features  {\"kickoff_alert\":true}")
+    lines.append("  أضف ?token=YOUR_TOKEN إن فعّلت DASHBOARD_TOKEN")
+    lines.append("=" * 46)
+    return "\n".join(lines)
+
+
+@app.get("/menu", response_class=PlainTextResponse)
+async def api_menu(auth=Depends(check_auth)):
+    """مينو نصي للبروكسي — للاستخدام بدون لوحة رسومية."""
+    return _menu_text()
 
 
 @app.get("/api/export")

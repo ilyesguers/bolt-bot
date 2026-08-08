@@ -131,6 +131,21 @@ class MatchTrackerTests(unittest.TestCase):
         self.assertIn("تقدير", snap["note"])
         self.assertEqual(snap["phase"], PHASE_IDLE)
 
+    def test_session_kickoff_at_resets_on_new_session_only(self):
+        self.tracker.connection_start("host")
+        kickoff1 = self.tracker.snapshot()["session_kickoff_at"]
+        self.clock.advance(30)
+        self.tracker.connection_end("host")
+        # اتصال قريب (لا جلسة جديدة) — المؤقّت يبقى يقيس من نفس البداية
+        self.tracker.connection_start("host")
+        self.assertEqual(self.tracker.snapshot()["session_kickoff_at"], kickoff1)
+        self.clock.advance(10)
+        self.tracker.connection_end("host")
+        # فجوة طويلة = مباراة جديدة — يتحدث المؤقّت
+        self.clock.advance(120)
+        self.tracker.connection_start("host")
+        self.assertGreater(self.tracker.snapshot()["session_kickoff_at"], kickoff1)
+
     def test_sparse_session_is_classified_offline_ai(self):
         # جلسة طويلة بحركة قليلة (مزامنة فقط) = مباراة آفلان ضد AI
         self.tracker.connection_start("host")

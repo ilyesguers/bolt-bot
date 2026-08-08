@@ -4,6 +4,7 @@
 2026-08-07 - v4.1 Advanced
 """
 import asyncio
+import random
 import time
 import re
 from .config import PORT
@@ -37,6 +38,23 @@ def _notify_match_events(events):
             level="warning",
             category="phase",
             phase=event["phase"],
+        )
+
+
+def _maybe_auto_finish():
+    """⏰ مؤقّت المباراة: إن انقضت المدة من بداية المباراة → إنهاء تلقائي (مرة واحدة لكل مباراة)."""
+    if netctl.auto_finish_sec() <= 0:
+        return
+    snap = tracker.snapshot()
+    if snap["phase"] in ("idle", "full_time"):
+        return
+    if netctl.auto_finish_due(snap.get("session_kickoff_at") or snap["session_start"]):
+        result = netctl.finish_match()
+        add_notification(
+            f"⏰ مؤقّت المباراة: انقضت {netctl.auto_finish_sec()} ثانية — "
+            f"أُنهيت المباراة تلقائياً (قُطعت {result['killed']} اتصالات)",
+            level="warning",
+            category="auto_finish",
         )
 
 async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
@@ -110,7 +128,8 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
 
         ai_tracker = None
         if is_connect and is_ai_host(host):
-            if netctl.get_setting("result_guard") and tracker.snapshot()["phase"] == PHASE_FULL_TIME:
+            snap = tracker.snapshot()
+            if netctl.result_guard_applies(host, snap["phase"], snap["mode"]):
                 netctl.record_action("🛑 منع رفع النتيجة", f"أُسقط اتصال {host} بعد نهاية المباراة (تقديري)")
                 add_notification(
                     "🛑 منع رفع النتيجة — أُسقط اتصال مزامنة بعد نهاية المباراة (تقديري)",
@@ -132,6 +151,7 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                 encrypted_tunnel=True,
             )
             _notify_match_events(tracker.connection_start(host))
+            _maybe_auto_finish()
             add_notification(
                 "تم رصد اتصال خادم AI — تحليل TLS metadata بدون تعديل البايتات",
                 level="warning" if enabled_features else "info",
@@ -139,18 +159,22 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                 requested_features=enabled_features,
             )
 
-        if host and netctl.should_block(host):
-            netctl.record_action("🛡️ حجب نطاق", f"تم حجب الاتصال بـ {host}:{port} حسب قائمة الحظر")
-            add_notification(f"🛡️ حُجب الاتصال بـ {host}", level="warning", host=host, rule="blocklist")
-            if should_log:
-                store.add({"method": method, "host": host, "port": port, "target": target, "status": "BLOCKED (dashboard)", "duration_ms": 0})
-            try:
-                writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
-                await writer.drain()
-            except Exception:
-                pass
-            writer.close()
-            return
+        if host:
+            reason = netctl.block_reason(host)
+            if reason:
+                labels = {"blocklist": "قائمة الحظر", "matchmaking": "مانع المطابقة", "cooldown_finish": "منع العودة بعد الإنهاء"}
+                label = labels.get(reason, reason)
+                netctl.record_action("🛡️ حجب نطاق", f"تم حجب الاتصال بـ {host}:{port} — {label}")
+                add_notification(f"🛡️ حُجب الاتصال بـ {host} ({label})", level="warning", host=host, rule=reason)
+                if should_log:
+                    store.add({"method": method, "host": host, "port": port, "target": target, "status": f"BLOCKED ({label})", "duration_ms": 0})
+                try:
+                    writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+                    await writer.drain()
+                except Exception:
+                    pass
+                writer.close()
+                return
 
         if is_connect:
             try:
@@ -177,6 +201,7 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                             if ai_tracker is not None:
                                 chunk = ai_tracker.process(chunk, direction)
                                 _notify_match_events(tracker.chunk(direction, len(chunk)))
+                                _maybe_auto_finish()
                             cap_kbps = netctl.throttle_kbps()
                             if cap_kbps > 0:
                                 sent += len(chunk)
@@ -184,6 +209,9 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                                 wait = target - (time.monotonic() - start_t)
                                 if wait > 0:
                                     await asyncio.sleep(wait)
+                            jitter = netctl.jitter_ms()
+                            if jitter > 0:
+                                await asyncio.sleep(random.uniform(0, jitter) / 1000.0)
                             w.write(chunk)
                             await w.drain()
                     except:

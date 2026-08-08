@@ -216,7 +216,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
   <div class="ai-panel-head">
     <div>
       <div class="ai-panel-title" id="netctl-panel-title">🎛️ تحكم الشبكة — بروكسي فقط</div>
-      <div class="ai-panel-subtitle">قطع الاتصال • تحديد السرعة • حجب النطاقات • منع رفع النتيجة — كلها تعمل على مستوى الشبكة دون أي تعديل على جهازك</div>
+      <div class="ai-panel-subtitle">قطع الاتصال • إنهاء المباراة • مانع المطابقة • مؤقّت المباراة • Jitter — كلها تعمل على مستوى الشبكة دون أي تعديل على جهازك • <a href="/menu" style="color:var(--accent);">📄 مينو نصي للبروكسي</a></div>
     </div>
     <span class="badge badge-gold">Proxy-Only</span>
   </div>
@@ -242,8 +242,35 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
           <div style="font-size:11px;font-weight:900;color:var(--text);">🛑 منع رفع النتيجة بعد نهاية المباراة <span style="color:var(--gold);">(تجريبي)</span></div>
           <div style="font-size:9px;color:var(--muted);">يُسقط اتصالات خادم AI التي تظهر بعد "نهاية المباراة" — قد يمنع تسجيل الخسارة لكن قد يمنع المكافآت أيضاً.</div>
         </div>
-        <input id="resultGuardInput" type="checkbox" {% if netctl_settings.result_guard %}checked{% endif %} style="width:18px;height:18px;accent-color:#ffca28;">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <select id="resultGuardScopeInput" style="background:rgba(5,10,31,.9);border:1px solid var(--border);color:var(--text);padding:6px;border-radius:8px;font-size:10px;">
+            <option value="offline" {% if netctl_settings.result_guard_scope == 'offline' %}selected{% endif %}>آفلان فقط (موصى به)</option>
+            <option value="all" {% if netctl_settings.result_guard_scope == 'all' %}selected{% endif %}>كل الجلسات</option>
+          </select>
+          <input id="resultGuardInput" type="checkbox" {% if netctl_settings.result_guard %}checked{% endif %} style="width:18px;height:18px;accent-color:#ffca28;">
+        </span>
       </label>
+      <label class="netctl-row" style="cursor:pointer;">
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:900;color:var(--text);">🚫 مانع المطابقة <span style="color:var(--accent2);">(الأكثر أماناً)</span></div>
+          <div style="font-size:9px;color:var(--muted);">يحجب نطاقات البحث عن الخصم (تخمين بالكلمات: match/lobby/queue/...) — اللعبة تبقى في البحث للأبد وأنت تلعب آفلان فقط بدون أي عقوبة. تخميني وليس قائمة موثقة.</div>
+        </div>
+        <input id="blockMatchmakingInput" type="checkbox" {% if netctl_settings.block_matchmaking %}checked{% endif %} style="width:18px;height:18px;accent-color:#00e676;">
+      </label>
+      <div class="netctl-row">
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:900;color:var(--text);">⏰ مؤقّت المباراة (ثوانٍ) <span style="color:var(--gold);">(0 = متوقف)</span></div>
+          <div style="font-size:9px;color:var(--muted);">بعد انقضاء المدة من بداية الجلسة ينهي البروكسي المباراة تلقائياً (قطع + منع عودة). مباراة آفلان قصيرة: 60-120 ثانية. قطع أعمى — يقطع سواء كنت كاسباً أو خاسراً.</div>
+        </div>
+        <input id="autoFinishInput" type="number" min="0" max="3600" value="{{ netctl_settings.auto_finish_sec }}" style="width:80px;background:rgba(5,10,31,.9);border:1px solid var(--border);color:var(--text);padding:7px;border-radius:8px;">
+      </div>
+      <div class="netctl-row">
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:900;color:var(--text);">📉 Jitter (تأخير عشوائي بالمللي ثانية) <span style="color:var(--gold);">(لا أنصح به)</span></div>
+          <div style="font-size:9px;color:var(--muted);">تأخير عشوائي على الحزم في الاتجاهين — يسبب Desync ويبطّئ <b>عليك أنت أيضاً</b>، وقد يُكتشف كبروكسي. أضعف ميزة في الكتالوج.</div>
+        </div>
+        <input id="jitterInput" type="number" min="0" max="2000" value="{{ netctl_settings.jitter_ms }}" style="width:80px;background:rgba(5,10,31,.9);border:1px solid var(--border);color:var(--text);padding:7px;border-radius:8px;">
+      </div>
       <div style="margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.35);">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <b style="font-size:12px;color:#ff8a80;">⚡ إنهاء المباراة الآن</b>
@@ -545,6 +572,10 @@ async function loadNetCtl(){
     document.getElementById('throttleInput').value = data.settings.throttle_kbps;
     document.getElementById('blockHostsInput').value = (data.settings.block_hosts||[]).join('\n');
     document.getElementById('resultGuardInput').checked = data.settings.result_guard === true;
+    document.getElementById('resultGuardScopeInput').value = data.settings.result_guard_scope || 'offline';
+    document.getElementById('blockMatchmakingInput').checked = data.settings.block_matchmaking === true;
+    document.getElementById('autoFinishInput').value = data.settings.auto_finish_sec || 0;
+    document.getElementById('jitterInput').value = data.settings.jitter_ms || 0;
     renderNetCtlActions(data.actions||[]);
     renderTempBlocks(data.temp_blocks||[]);
     document.getElementById('activeCount').textContent = data.sessions.length;
@@ -558,13 +589,17 @@ async function saveNetCtl(){
   const throttle = parseInt(document.getElementById('throttleInput').value, 10) || 0;
   const blockHosts = document.getElementById('blockHostsInput').value.split('\n').map(s=>s.trim()).filter(Boolean);
   const resultGuard = document.getElementById('resultGuardInput').checked;
+  const resultGuardScope = document.getElementById('resultGuardScopeInput').value;
+  const blockMatchmaking = document.getElementById('blockMatchmakingInput').checked;
+  const autoFinish = parseInt(document.getElementById('autoFinishInput').value, 10) || 0;
+  const jitter = parseInt(document.getElementById('jitterInput').value, 10) || 0;
   button.disabled = true;
   status.textContent = 'جارٍ الحفظ...';
   try{
     const response = await apiFetch('/api/netctl', {
       method:'POST',
       headers:{'content-type':'application/json'},
-      body:JSON.stringify({settings:{throttle_kbps:throttle, block_hosts:blockHosts, result_guard:resultGuard}})
+      body:JSON.stringify({settings:{throttle_kbps:throttle, block_hosts:blockHosts, result_guard:resultGuard, result_guard_scope:resultGuardScope, block_matchmaking:blockMatchmaking, auto_finish_sec:autoFinish, jitter_ms:jitter}})
     });
     const data = await response.json();
     if(!response.ok) throw new Error(typeof data.detail==='string' ? data.detail : 'فشل الحفظ');
