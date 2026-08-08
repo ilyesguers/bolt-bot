@@ -19,12 +19,14 @@ from .auth import check_auth
 from .match_tracker import tracker
 from .netctl import (
     active_sessions,
+    finish_match,
     get_actions,
     get_setting,
     kill_all,
     load_settings,
     record_action,
     save_settings as save_netctl,
+    temp_blocks,
 )
 from .modmenu import FEATURES as MODMENU_FEATURES
 from .modmenu import config_payload, get_enabled as get_modmenu_enabled
@@ -84,6 +86,10 @@ async def ws_broadcaster():
                     "logs": store.get_all(limit=10),
                     "notifications": get_notifications(),
                     "match": tracker.snapshot(),
+                    "netctl": {
+                        "temp_blocks": temp_blocks(),
+                        "sessions": active_sessions(),
+                    },
                 }
                 await ws_manager.broadcast(data)
             except:
@@ -319,6 +325,7 @@ def _netctl_response():
         "settings": settings,
         "sessions": active_sessions(),
         "actions": get_actions(),
+        "temp_blocks": temp_blocks(),
         "mode": "proxy_only",
         "notice": (
             "تحكمات شبكية بحتة تعمل عبر البروكسي فقط. لا يمكنها تغيير ذكاء AI "
@@ -380,6 +387,49 @@ async def api_netctl_kill(auth=Depends(check_auth)):
     return {"killed": count, "sessions": active_sessions()}
 
 
+@app.post("/api/netctl/finish")
+async def api_netctl_finish(request: Request, auth=Depends(check_auth)):
+    """⚡ إنهاء المباراة الآن: قطع + منع إعادة الاتصال لمدة كولداون."""
+    cooldown_sec = None
+    try:
+        payload = await request.json()
+        if isinstance(payload, dict):
+            cooldown_sec = payload.get("cooldown_sec")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        pass
+
+    if cooldown_sec is not None:
+        if type(cooldown_sec) is not int or not (0 <= cooldown_sec <= 3600):
+            raise HTTPException(
+                status_code=422,
+                detail="cooldown_sec يجب أن يكون رقماً صحيحاً بين 0 و 3600",
+            )
+
+    result = finish_match(cooldown_sec)
+    events = tracker.manual_finish()
+    for event in events:
+        add_notification(
+            f"⚽ {event['label']}",
+            level="warning",
+            category="finish",
+            phase=event["phase"],
+        )
+    add_notification(
+        "⚡ إنهاء المباراة — "
+        f"قُطعت {result['killed']} اتصالات وحُجب العودة لمدة {result['cooldown_sec']} ثانية",
+        level="warning",
+        killed=result["killed"],
+        blocked_hosts=result["blocked_hosts"][:5],
+        cooldown_sec=result["cooldown_sec"],
+    )
+    return {
+        **result,
+        "temp_blocks": temp_blocks(),
+        "sessions": active_sessions(),
+        "match": tracker.snapshot(),
+    }
+
+
 @app.get("/api/export")
 async def api_export(auth=Depends(check_auth)):
     return {"export_date": TODAY, "version": VERSION, "logs": store.get_all(limit=800), "stats": store.get_stats()}
@@ -427,6 +477,7 @@ def _dashboard_context():
         "netctl_settings": load_settings(),
         "netctl_sessions": active_sessions(),
         "netctl_actions": get_actions(),
+        "netctl_temp_blocks": temp_blocks(),
     }
 
 @app.get("/", response_class=HTMLResponse)

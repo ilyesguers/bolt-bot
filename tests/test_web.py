@@ -148,6 +148,28 @@ class FeatureAPITests(unittest.TestCase):
         self.assertEqual(kill.status_code, 200)
         self.assertIn("killed", kill.json())
 
+    def test_finish_match_endpoint(self):
+        result = self.client.post(
+            "/api/netctl/finish", json={"cooldown_sec": 60}
+        )
+        self.assertEqual(result.status_code, 200)
+        body = result.json()
+        self.assertIn("killed", body)
+        self.assertEqual(body["cooldown_sec"], 60)
+        self.assertIn("pes22-game.cs.konami.net", body["blocked_hosts"])
+        self.assertEqual(len(body["temp_blocks"]), 1)
+        # الآن الاتصال بخادم AI ممنوع (403) أثناء الكولداون
+        blocked = self.client.post(
+            "/api/netctl/finish", json={"cooldown_sec": 99999}
+        )
+        self.assertEqual(blocked.status_code, 422)
+        invalid = self.client.post("/api/netctl/finish", json={"cooldown_sec": "x"})
+        self.assertEqual(invalid.status_code, 422)
+
+        # تنظيف الكولداون حتى لا يؤثر على بقية الاختبارات
+        from src import netctl
+        netctl._temp_blocks.clear()
+
     def test_dashboard_contains_network_controls(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)

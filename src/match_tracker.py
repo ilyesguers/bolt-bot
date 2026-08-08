@@ -98,6 +98,8 @@ class MatchTracker:
         if kind == "mode":
             event["mode"] = self.mode
             event["label"] = MODE_LABELS.get(self.mode, self.mode)
+        if kind == "finish":
+            event["label"] = "⚡ إنهاء المباراة يدوياً"
         self.timeline.append(event)
         return event
 
@@ -222,6 +224,25 @@ class MatchTracker:
         ):
             return MODE_ONLINE
         return MODE_UNKNOWN
+
+    def manual_finish(self) -> list[dict[str, Any]]:
+        """يُستدعى عند زر "إنهاء المباراة" من اللوحة — يسجّل الحدث في الخط الزمني.
+
+        لا يدّعي معرفة النتيجة؛ يسجّل فقط أن المستخدم أنهى المباراة يدوياً
+        ويجعل الطور ``full_time`` إذا كانت مباراة جارية (ليتفاعل كولداون
+        الإنهاء ومنع رفع النتيجة مع الاتصالات اللاحقة).
+        """
+        now = self._now()
+        events: list[dict[str, Any]] = []
+        with self._lock:
+            if self.phase not in (PHASE_IDLE, PHASE_FULL_TIME):
+                self.phase = PHASE_FULL_TIME
+                self.phase_since = now
+                events.append(self._add_event(PHASE_FULL_TIME, kind="finish"))
+            else:
+                events.append(self._add_event(self.phase, kind="finish"))
+            self.last_activity = now
+        return events
 
     # -- read ------------------------------------------------------------
     def snapshot(self) -> dict[str, Any]:

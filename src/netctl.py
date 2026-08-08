@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import DATA_DIR
+from .ai_analyzer import AI_HOSTS
 
 DATA_FILE = Path(
     os.environ.get("NETCTL_FILE", str(Path(DATA_DIR) / "netctl.json"))
@@ -35,12 +36,19 @@ _lock = threading.RLock()
 _action_lock = threading.Lock()
 _actions: deque[dict[str, Any]] = deque(maxlen=20)
 
+# ساعة قابلة للاستبدال في الاختبارات
+_now = time.time
+
 # نسخة حية سريعة القراءة — تُحدَّث من الملف عند التحميل/الحفظ
 _settings: dict[str, Any] = {
     "throttle_kbps": 0,
     "block_hosts": [],
     "result_guard": False,
+    "finish_cooldown_sec": 120,
 }
+
+# حجب مؤقت (منع إعادة الاتصال بعد إنهاء المباراة) — host -> حتى (timestamp)
+_temp_blocks: dict[str, float] = {}
 
 _sessions: dict[int, dict[str, Any]] = {}
 _next_id = 0
@@ -58,6 +66,12 @@ def _normalize(bundle: Mapping[str, Any] | None) -> dict[str, Any]:
     except (TypeError, ValueError):
         throttle = 0
 
+    cooldown = bundle.get("finish_cooldown_sec", 120)
+    try:
+        cooldown = max(0, min(3600, int(cooldown)))
+    except (TypeError, ValueError):
+        cooldown = 120
+
     block_hosts = bundle.get("block_hosts", [])
     if not isinstance(block_hosts, list):
         block_hosts = []
@@ -71,6 +85,7 @@ def _normalize(bundle: Mapping[str, Any] | None) -> dict[str, Any]:
         "throttle_kbps": throttle,
         "block_hosts": cleaned[:50],
         "result_guard": bundle.get("result_guard") is True,
+        "finish_cooldown_sec": cooldown,
         "updated_at": bundle.get("updated_at"),
     }
 
@@ -114,7 +129,8 @@ def save_settings(values: Mapping[str, Any]) -> dict[str, Any]:
         record_action(
             "⚙️ تغيير إعدادات الشبكة",
             f"تحديد سرعة: {current['throttle_kbps']}KB/s • حجب: {len(current['block_hosts'])} نطاق • "
-            f"منع رفع النتيجة: {'نشط' if current['result_guard'] else 'متوقف'}",
+            f"منع رفع النتيجة: {'نشط' if current['result_guard'] else 'متوقف'} • "
+            f"كولداون الإنهاء: {current['finish_cooldown_sec']}ث",
         )
         return dict(current)
 
@@ -129,16 +145,89 @@ def throttle_kbps() -> int:
         return int(_settings.get("throttle_kbps", 0))
 
 
-def should_block(host: str) -> bool:
-    """هل النطاق في قائمة الحظر؟ (مطابقة لاحقة بعد تنظيف المنفذ)."""
-    if not host:
-        return False
+def _clean_host(host: str) -> str:
     value = (host or "").strip().lower().rstrip(".")
     if ":" in value:
         value = value.rsplit(":", 1)[0]
+    return value
+
+
+def should_block(host: str) -> bool:
+    """هل النطاق ممنوع؟ قائمة الحظر الثابتة + الحجب المؤقت (كولداون الإنهاء)."""
+    if not host:
+        return False
+    value = _clean_host(host)
+    now = _now()
     with _lock:
+        until = _temp_blocks.get(value)
+        if until is not None:
+            if until > now:
+                return True
+            _temp_blocks.pop(value, None)
         rules = _settings.get("block_hosts", [])
     return any(value == rule or value.endswith("." + rule) for rule in rules)
+
+
+def temp_blocks() -> list[dict[str, Any]]:
+    """قائمة الحجب المؤقت مع الوقت المتبقي (للعرض في اللوحة)."""
+    now = _now()
+    with _lock:
+        expired = [h for h, until in _temp_blocks.items() if until <= now]
+        for host in expired:
+            _temp_blocks.pop(host, None)
+        return [
+            {"host": host, "until": until, "remaining": round(until - now, 1)}
+            for host, until in sorted(_temp_blocks.items(), key=lambda item: item[1])
+        ]
+
+
+def finish_match(cooldown_sec: int | None = None) -> dict[str, Any]:
+    """⚡ إنهاء المباراة الآن: قطع كل الاتصالات + منع إعادة الاتصال مؤقتاً.
+
+    - يغلق كل الأنفاق النشطة مع خادم اللعبة فوراً.
+    - يضيف حجباً مؤقتاً (كولداون) لكل مضيف نشط + خوادم AI المعروفة،
+      حتى لا تعود اللعبة وتكمل المباراة/المزامنة.
+    - يعيد ملخص: عدد المقصوص + المضيفات المحجوبة + مدة الكولداون.
+
+    هذه "إنهاء" شبكي: في الأونلاين تنتهي المباراة بالقطع (تُحسب حسب سياسة
+    اللعبة)، وفي الآفلان تمنع المزامنة (اللعبة محلية) — لا تغيّر النتيجة.
+    """
+    with _lock:
+        default = int(_settings.get("finish_cooldown_sec", 120))
+    cooldown = int(cooldown_sec) if cooldown_sec is not None else default
+    cooldown = max(0, min(3600, cooldown))
+
+    now = _now()
+    hosts: set[str] = set(AI_HOSTS)
+    with _lock:
+        for session in list(_sessions.values()):
+            host = _clean_host(session.get("host", ""))
+            if host:
+                hosts.add(host)
+
+    killed = kill_all("⚡ إنهاء المباراة — منع إعادة الاتصال")
+
+    until = now + cooldown
+    with _lock:
+        for host in hosts:
+            if host:
+                _temp_blocks[host] = until
+        expired = [h for h, u in _temp_blocks.items() if u <= now]
+        for host in expired:
+            _temp_blocks.pop(host, None)
+
+    blocked = sorted(host for host in hosts if host)
+    record_action(
+        "⚡ إنهاء المباراة",
+        f"قُطعت {killed} اتصالات • حُجب العودة لـ {len(blocked)} مضيف لمدة {cooldown} ثانية"
+        + (f" ({', '.join(blocked[:4])}{'…' if len(blocked) > 4 else ''})" if blocked else ""),
+    )
+    return {
+        "killed": killed,
+        "blocked_hosts": blocked,
+        "until": until,
+        "cooldown_sec": cooldown,
+    }
 
 
 # ---------------------------------------------------------------------------

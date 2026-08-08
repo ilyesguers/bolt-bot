@@ -7,7 +7,7 @@ import threading
 import time
 import re
 import uvicorn
-from .config import PORT, BANNER, is_efootball_host, get_host_category, EFOOTBALL_ONLY
+from .config import PORT, BANNER, VERSION, is_efootball_host, get_host_category, EFOOTBALL_ONLY
 from .web import app
 from .logger import store
 from .advanced import analyze_payload_metadata

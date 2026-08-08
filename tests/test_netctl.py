@@ -1,4 +1,5 @@
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -102,6 +103,49 @@ class NetCtlTests(unittest.TestCase):
         actions = netctl.get_actions()
         self.assertEqual(len(actions), 10)
         self.assertEqual(actions[0]["msg"], "action-24")
+
+    def test_finish_match_kills_and_temp_blocks_reconnect(self):
+        # ساعة قابلة للدفع
+        clock = {"t": 1000.0}
+        netctl._now = lambda: clock["t"]
+
+        writer = DummyWriter()
+        netctl.register_session(writer, None, "pes22-game.cs.konami.net", 443)
+
+        result = netctl.finish_match(cooldown_sec=60)
+        self.assertEqual(result["killed"], 1)
+        self.assertIn("pes22-game.cs.konami.net", result["blocked_hosts"])
+        self.assertEqual(result["cooldown_sec"], 60)
+
+        # خلال الكولداون: ممنوع العودة
+        clock["t"] = 1030.0
+        self.assertTrue(netctl.should_block("pes22-game.cs.konami.net"))
+        self.assertEqual(len(netctl.temp_blocks()), 1)
+
+        # بعد انتهاء الكولداون: يسمح مجدداً
+        clock["t"] = 1070.0
+        self.assertFalse(netctl.should_block("pes22-game.cs.konami.net"))
+        self.assertEqual(netctl.temp_blocks(), [])
+
+        netctl._now = time.time
+        netctl._temp_blocks.clear()
+
+    def test_finish_match_defaults_to_saved_cooldown_and_clamps(self):
+        clock = {"t": 2000.0}
+        netctl._now = lambda: clock["t"]
+        netctl.save_settings({"finish_cooldown_sec": 30})
+
+        result = netctl.finish_match()  # يستخدم الافتراضي المحفوظ
+        self.assertEqual(result["cooldown_sec"], 30)
+
+        result = netctl.finish_match(cooldown_sec=999_999)
+        self.assertEqual(result["cooldown_sec"], 3600)
+
+        result = netctl.finish_match(cooldown_sec=-5)
+        self.assertEqual(result["cooldown_sec"], 0)
+
+        netctl._now = time.time
+        netctl._temp_blocks.clear()
 
 
 if __name__ == "__main__":

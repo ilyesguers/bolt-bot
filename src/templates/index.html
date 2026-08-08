@@ -244,6 +244,21 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
         </div>
         <input id="resultGuardInput" type="checkbox" {% if netctl_settings.result_guard %}checked{% endif %} style="width:18px;height:18px;accent-color:#ffca28;">
       </label>
+      <div style="margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.35);">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <b style="font-size:12px;color:#ff8a80;">⚡ إنهاء المباراة الآن</b>
+          <select id="finishCooldownSelect" style="background:rgba(5,10,31,.9);border:1px solid var(--border);color:var(--text);padding:6px;border-radius:8px;font-size:10px;">
+            <option value="0" {% if netctl_settings.finish_cooldown_sec == 0 %}selected{% endif %}>بدون منع العودة</option>
+            <option value="30" {% if netctl_settings.finish_cooldown_sec == 30 %}selected{% endif %}>منع العودة 30 ثانية</option>
+            <option value="60" {% if netctl_settings.finish_cooldown_sec == 60 %}selected{% endif %}>منع العودة 60 ثانية</option>
+            <option value="120" {% if netctl_settings.finish_cooldown_sec == 120 %}selected{% endif %}>منع العودة 120 ثانية</option>
+            <option value="300" {% if netctl_settings.finish_cooldown_sec == 300 %}selected{% endif %}>منع العودة 300 ثانية</option>
+          </select>
+          <button class="btn btn-danger" onclick="finishMatch()">⚡ إنهاء المباراة</button>
+        </div>
+        <div style="font-size:9px;color:var(--muted);margin-top:6px;line-height:1.6;">يقطع كل الاتصالات مع اللعبة فوراً ويمنع إعادة الاتصال للمدة المختارة — حتى لا تكمل المباراة. في الأونلاين تُحسب النهاية حسب سياسة اللعبة؛ في الآفلان يمنع المزامنة. <b style="color:#ff8a80;">لا يغيّر النتيجة داخل اللعبة.</b></div>
+      </div>
+      <div id="tempBlockList" style="margin-top:8px;font-size:10px;color:var(--muted);"></div>
       <div class="ai-actions">
         <button class="btn btn-primary" id="saveNetCtlBtn" onclick="saveNetCtl()">💾 حفظ التحكم</button>
         <button class="btn btn-danger" onclick="killAll()">🔌 قطع كل الاتصالات</button>
@@ -369,7 +384,7 @@ function connectWS(){
     ws = new WebSocket(proto+'//'+location.host+'/ws/live');
     ws.onopen = ()=> document.getElementById('wsStatus').textContent='● Live';
     ws.onclose = ()=> { document.getElementById('wsStatus').textContent='○ Polling'; setTimeout(connectWS,3000); };
-    ws.onmessage = (e)=>{ try{ const j=JSON.parse(e.data); if(j.type==='update'){ updateStats(j.stats); if(currentTab==='all') renderLogs(j.logs); if(j.notifications) handleNotifications(j.notifications); if(j.match) renderMatchPhase(j.match); } }catch{} };
+    ws.onmessage = (e)=>{ try{ const j=JSON.parse(e.data); if(j.type==='update'){ updateStats(j.stats); if(currentTab==='all') renderLogs(j.logs); if(j.notifications) handleNotifications(j.notifications); if(j.match) renderMatchPhase(j.match); if(j.netctl){ renderTempBlocks(j.netctl.temp_blocks||[]); if(document.getElementById('activeCount')) document.getElementById('activeCount').textContent = j.netctl.sessions.length; } } }catch{} };
   }catch{ document.getElementById('wsStatus').textContent='○ Polling'; }
 }
 connectWS();
@@ -519,7 +534,8 @@ function renderMatchPhase(match){
   el('matchPhaseSince').textContent = match.phase_since ? 'منذ ' + new Date(match.phase_since*1000).toLocaleTimeString('ar-DZ') : '—';
   el('matchConnCount').textContent = (match.connections||0) + ' اتصالات';
   el('matchBytes').textContent = (match.server_bytes||0) + 'B ⬇ / ' + (match.client_bytes||0) + 'B ⬆';
-  el('matchTimeline').innerHTML = (match.timeline||[]).map(e=>`<span>${e.kind==='mode'?'🧭':'⚽'} ${escapeHTML(e.label)} • ${new Date(e.timestamp*1000).toLocaleTimeString('ar-DZ')}</span>`).join('');
+  const tlIcon = e=> e.kind==='mode' ? '🧭' : (e.kind==='finish' ? '⚡' : '⚽');
+  el('matchTimeline').innerHTML = (match.timeline||[]).map(e=>`<span>${tlIcon(e)} ${escapeHTML(e.label)} • ${new Date(e.timestamp*1000).toLocaleTimeString('ar-DZ')}</span>`).join('');
 }
 async function loadNetCtl(){
   try{
@@ -530,6 +546,7 @@ async function loadNetCtl(){
     document.getElementById('blockHostsInput').value = (data.settings.block_hosts||[]).join('\n');
     document.getElementById('resultGuardInput').checked = data.settings.result_guard === true;
     renderNetCtlActions(data.actions||[]);
+    renderTempBlocks(data.temp_blocks||[]);
     document.getElementById('activeCount').textContent = data.sessions.length;
   }catch(error){
     document.getElementById('netCtlStatus').textContent = error.message || 'تعذر التحميل';
@@ -569,6 +586,36 @@ async function killAll(){
     document.getElementById('activeCount').textContent = data.sessions.length;
     await refreshNotifications();
   }catch{}
+}
+async function finishMatch(){
+  const cooldown = parseInt(document.getElementById('finishCooldownSelect').value, 10) || 0;
+  const cooldownText = cooldown ? ' ويمنع العودة لمدة ' + cooldown + ' ثانية' : ' دون منع العودة';
+  if(!confirm('⚡ إنهاء المباراة الآن؟ سيُقطع كل اتصالات اللعبة' + cooldownText + '. في الأونلاين تُحسب النهاية حسب سياسة اللعبة، والنتيجة داخل اللعبة لا تتغير.')) return;
+  const btn = document.querySelector('button[onclick="finishMatch()"]');
+  btn.disabled = true;
+  try{
+    const response = await apiFetch('/api/netctl/finish', {
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({cooldown_sec:cooldown})
+    });
+    const data = await response.json();
+    if(!response.ok) throw new Error(typeof data.detail==='string' ? data.detail : 'فشل الإنهاء');
+    showToast({level:'warning', msg:'⚡ أُنهيت المباراة — قُطعت ' + data.killed + ' اتصال' + (data.cooldown_sec ? '، عودة محجوبة ' + data.cooldown_sec + 'ث' : ''), time:new Date().toLocaleTimeString('ar-DZ')});
+    document.getElementById('activeCount').textContent = data.sessions.length;
+    renderTempBlocks(data.temp_blocks || []);
+    if(data.match && data.match.phase_label) document.getElementById('matchPhase').textContent = data.match.phase_label;
+    await refreshNotifications();
+  }catch(error){
+    showToast({level:'error', msg:'✕ ' + (error.message || 'فشل الإنهاء'), time:new Date().toLocaleTimeString('ar-DZ')});
+  }finally{
+    btn.disabled = false;
+  }
+}
+function renderTempBlocks(blocks){
+  const el = document.getElementById('tempBlockList');
+  if(!blocks || !blocks.length){ el.innerHTML=''; return; }
+  el.innerHTML = blocks.map(b=>`⛔ <b style="color:#ffca28;">${escapeHTML(b.host)}</b> — محجوبة حتى ${new Date(b.until*1000).toLocaleTimeString('ar-DZ')} (${Math.max(0, Math.round(b.remaining))}ث متبقية)`).join('<br>');
 }
 function renderNetCtlActions(items){
   const c = document.getElementById('netCtlActions');

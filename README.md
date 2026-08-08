@@ -1,17 +1,30 @@
-# ⚡ eFootball Traffic Analyzer — v5.4
+# ⚡ eFootball Traffic Analyzer — v5.5
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-5.4.0-00E676?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-5.5.0-00E676?style=for-the-badge)
 ![Build](https://img.shields.io/badge/build-passing-2962FF?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-Railway%20%7C%20iPhone%2013-0A1433?style=for-the-badge)
 ![Date](https://img.shields.io/badge/date-2026--08--08-FFCA28?style=for-the-badge)
 
-**Proxy passthrough + Dashboard + AI-host traffic metadata + Feature Engine (target/timing) + Live Match Phase + Real Notifications + Proxy-Only Network Controls**
+**Proxy passthrough + Dashboard + AI-host traffic metadata + Feature Engine (target/timing) + Live Match Phase + Real Notifications + Proxy-Only Network Controls + Instant Match Finish**
 
 </div>
 
 ---
+
+## ما الجديد في v5.5 — ⚡ إنهاء المباراة الآن (حقيقي)
+
+- **زر "⚡ إنهاء المباراة"** في لوحة تحكم الشبكة: يقطع كل اتصالات اللعبة فوراً.
+- **منع إعادة الاتصال (كولداون)**: تختار مدة (0/30/60/120/300 ثانية) — خلالها
+  تُرفض أي محاولة اتصال بنطاقات المباراة وخوادم AI، فلا تعود اللعبة تكمل
+  المباراة أو المزامنة. الزر نفسه يعمل على المباراة **الحية الآن**.
+- يُسجَّل الحدث في **الخط الزمني للمباراة** (⚡) + سجل الإجراءات + Toast فوري.
+- **الصدق الكامل**: في الأونلاين يُحسب القطع حسب سياسة اللعبة (هزيمة/إلغاء)،
+  وفي الآفلان يمنع المزامنة — **لا يغيّر النتيجة داخل اللعبة** (مستحيل عبر
+  بروكسي). الإنهاء الحقيقي = إنهاء المباراة الفعلية على الجهاز/السيرفر عبر
+  الشبكة، وهذا ما يفعله الزر.
+- إعداد `finish_cooldown_sec` (افتراضي 120 ثانية) في `data/netctl.json`.
 
 ## ما الجديد في v5.4 — تحكم شبكي عبر البروكسي فقط
 
@@ -133,10 +146,11 @@ python -m src.main
 | `GET /api/modmenu` | تعريفات المود مينو وحالته |
 | `POST /api/modmenu` | حفظ مفاتيح المود مينو (`{"features":{...}}`) |
 | `GET /api/modmenu/config` | صيغة خفيفة للتطبيق المعدّل (dylib) |
-| `GET /api/netctl` | إعدادات التحكم الشبكي + الجلسات + سجل الإجراءات |
+| `GET /api/netctl` | إعدادات التحكم الشبكي + الجلسات + سجل الإجراءات + الحجب المؤقت |
 | `POST /api/netctl` | حفظ إعدادات التحكم الشبكي |
 | `POST /api/netctl/kill` | قطع كل الاتصالات النشطة |
-| `WS /ws/live` | تحديثات مباشرة (إحصائيات + سجلات + إشعارات + طور/نمط المباراة) |
+| `POST /api/netctl/finish` | ⚡ إنهاء المباراة + منع العودة `{"cooldown_sec":120}` |
+| `WS /ws/live` | تحديثات مباشرة (إحصائيات + سجلات + إشعارات + طور/نمط المباراة + حجب مؤقت) |
 | `GET /api/export/csv` | تصدير CSV |
 
 مثال:
