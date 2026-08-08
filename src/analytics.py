@@ -31,10 +31,7 @@ def compute_analytics(logs: List[Dict]) -> Dict:
         diff = int((now - l.get("timestamp", now)) // 60)
         if diff < 10:
             per_min[f"{diff}m"] += 1
-    
-    # TLS
-    tls13 = sum(1 for l in logs if l.get("tls_info",{}).get("tls_version")=="TLSv1.3")
-    
+
     return {
         "total": len(logs),
         "by_category": dict(by_cat),
@@ -44,6 +41,5 @@ def compute_analytics(logs: List[Dict]) -> Dict:
         "max_ms": max_ms,
         "min_ms": min_ms,
         "per_min": dict(per_min),
-        "tls13_ratio": round(tls13/len(logs)*100) if logs else 0,
         "today": TODAY,
     }

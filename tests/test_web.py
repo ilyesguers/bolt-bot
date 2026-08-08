@@ -20,7 +20,10 @@ class FeatureAPITests(unittest.TestCase):
         netctl._settings = {"throttle_kbps": 0, "block_hosts": [], "result_guard": False}
         netctl._sessions.clear()
         netctl._actions.clear()
+        netctl._recent_actions.clear()
+        netctl._temp_blocks.clear()
         features.notifications.clear()
+        features._recent_notifications.clear()
         self.client = TestClient(app)
 
     def tearDown(self):
@@ -30,7 +33,10 @@ class FeatureAPITests(unittest.TestCase):
         netctl.DATA_FILE = self._original_netctl
         netctl._sessions.clear()
         netctl._actions.clear()
+        netctl._recent_actions.clear()
+        netctl._temp_blocks.clear()
         features.notifications.clear()
+        features._recent_notifications.clear()
         self._temp_dir.cleanup()
 
     def test_get_and_post_features(self):
@@ -68,7 +74,7 @@ class FeatureAPITests(unittest.TestCase):
     def test_dashboard_contains_ai_controls(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("🎮 ميزات AI", response.text)
+        self.assertIn("🎮 ميزات الرصد", response.text)
         self.assertEqual(response.text.count('class="ai-checkbox"'), 9)
 
     def test_post_accepts_targets_and_timings(self):
