@@ -1,6 +1,6 @@
 """
-Web Dashboard - FastAPI - Integrated v5.1
-Live WebSocket + Analytics + AI Feature Controls + Auth
+Web Dashboard - FastAPI - Integrated v5.2
+Live WebSocket (stats + logs + notifications) + Analytics + AI Feature Engine + Auth
 2026-08-08
 """
 from fastapi import FastAPI, Request, Query, WebSocket, WebSocketDisconnect, Depends, HTTPException
@@ -16,13 +16,34 @@ from .config import EFOOTBALL_ONLY, EFOOTBALL_DOMAINS, TODAY, VERSION, VERSION_N
 from .logger import store
 from .analytics import compute_analytics
 from .auth import check_auth
+from .match_tracker import tracker
+from .netctl import (
+    active_sessions,
+    finish_match,
+    get_actions,
+    get_setting,
+    kill_all,
+    load_settings,
+    record_action,
+    save_settings as save_netctl,
+    temp_blocks,
+)
+from .features import FEATURES as AI_FEATURES
+from .modmenu import FEATURES as MODMENU_FEATURES
+from .modmenu import config_payload, get_enabled as get_modmenu_enabled
+from .modmenu import load_config, save_config as save_modmenu
 from .features import (
     FEATURES,
+    TARGETS,
+    TIMINGS,
     add_notification,
+    feature_statuses,
     get_enabled,
+    get_last_analysis,
     get_notifications,
     load_features,
-    save_features,
+    load_prefs,
+    save_prefs,
 )
 
 app = FastAPI(
@@ -54,13 +75,23 @@ class WSManager:
 
 ws_manager = WSManager()
 
-# خلفية ترسل تحديثات كل ثانيتين
+# خلفية ترسل تحديثات كل ثانيتين (إشعارات + حالة مباراة + سجلات)
 async def ws_broadcaster():
     while True:
         await asyncio.sleep(2)
         if ws_manager.active:
             try:
-                data = {"type":"update","stats": store.get_stats(), "logs": store.get_all(limit=10)}
+                data = {
+                    "type": "update",
+                    "stats": store.get_stats(),
+                    "logs": store.get_all(limit=10),
+                    "notifications": get_notifications(),
+                    "match": tracker.snapshot(),
+                    "netctl": {
+                        "temp_blocks": temp_blocks(),
+                        "sessions": active_sessions(),
+                    },
+                }
                 await ws_manager.broadcast(data)
             except:
                 pass
@@ -104,22 +135,34 @@ async def api_config(auth=Depends(check_auth)):
     return {
         "filter": "eFootball Only" if EFOOTBALL_ONLY else "All",
         "domains": EFOOTBALL_DOMAINS,
-        "mode": "INTEGRATED - READ-ONLY + Modern Decrypt + Live WS + Storage",
+        "mode": "INTEGRATED - READ-ONLY + Feature Engine + Live WS + Storage",
         "version": VERSION,
         "version_name": VERSION_NAME,
         "today": TODAY,
-        "features": ["Live WebSocket","Persistent Storage","Analytics Charts","File Organization","Modern Decrypt","Auto Update","CSV Export","Auth"],
+        "features": ["Live WebSocket","Persistent Storage","Analytics Charts","File Organization","Modern Decrypt","Auto Update","CSV Export","Auth","Match Phase Estimator","Feature Status"],
     }
+
 
 def _features_response():
     state = load_features()
+    prefs = load_prefs()
+    analysis = get_last_analysis()
+    match = tracker.snapshot()
+    statuses = feature_statuses(analysis, match["phase"])
     return {
         "features": FEATURES,
         "state": state,
+        "targets": prefs["targets"],
+        "timings": prefs["timings"],
         "enabled": [key for key, value in state.items() if value],
         "mode": "metadata_only",
         "can_modify_tls": False,
-        "notice": "CONNECT/TLS مشفر؛ التفضيلات محفوظة لكن ciphertext يمر دون تعديل.",
+        "phase": match,
+        "statuses": statuses,
+        "targets_def": TARGETS,
+        "timings_def": TIMINGS,
+        "last_analysis": analysis,
+        "notice": "CONNECT/TLS مشفر؛ ميزات التعديل تُحفظ لكن ciphertext يمر دون تعديل. ميزات الرصد (تنبيهات/أطوار/بينغ) تعمل على الميتاداتا.",
     }
 
 
@@ -138,28 +181,55 @@ async def api_features_update(request: Request, auth=Depends(check_auth)):
     if not isinstance(payload, dict):
         raise HTTPException(status_code=422, detail="يجب إرسال JSON object")
 
-    values = payload.get("features", payload)
-    if not isinstance(values, dict):
+    # الصيغة الجديدة: {"features": {...}, "targets": {...}, "timings": {...}}
+    # الصيغة القديمة: {"slow_ai": true, ...}
+    if "features" in payload and isinstance(payload["features"], dict):
+        features_raw = payload.get("features")
+        targets_raw = payload.get("targets", {})
+        timings_raw = payload.get("timings", {})
+    else:
+        features_raw = payload
+        targets_raw = {}
+        timings_raw = {}
+
+    if not isinstance(features_raw, dict):
         raise HTTPException(status_code=422, detail="features يجب أن تكون object")
 
-    unknown = sorted(set(values) - set(FEATURES))
+    unknown = sorted(set(features_raw) - set(FEATURES))
     if unknown:
         raise HTTPException(
             status_code=422,
             detail={"message": "ميزات غير معروفة", "keys": unknown},
         )
-
-    invalid = sorted(key for key, value in values.items() if type(value) is not bool)
+    invalid = sorted(key for key, value in features_raw.items() if type(value) is not bool)
     if invalid:
         raise HTTPException(
             status_code=422,
             detail={"message": "قيم الميزات يجب أن تكون true/false", "keys": invalid},
         )
 
-    state = load_features()
-    state.update(values)
-    saved = save_features(state)
-    enabled_names = [FEATURES[key]["name"] for key, value in saved.items() if value]
+    if targets_raw:
+        if not isinstance(targets_raw, dict):
+            raise HTTPException(status_code=422, detail="targets يجب أن تكون object")
+        unknown_t = sorted(set(targets_raw) - set(FEATURES))
+        if unknown_t:
+            raise HTTPException(status_code=422, detail={"message": "أهداف غير معروفة", "keys": unknown_t})
+        invalid_t = sorted(key for key, value in targets_raw.items() if value not in TARGETS)
+        if invalid_t:
+            raise HTTPException(status_code=422, detail={"message": "قيم أهداف غير صالحة", "keys": invalid_t})
+
+    if timings_raw:
+        if not isinstance(timings_raw, dict):
+            raise HTTPException(status_code=422, detail="timings يجب أن تكون object")
+        unknown_ti = sorted(set(timings_raw) - set(FEATURES))
+        if unknown_ti:
+            raise HTTPException(status_code=422, detail={"message": "توقيتات غير معروفة", "keys": unknown_ti})
+        invalid_ti = sorted(key for key, value in timings_raw.items() if value not in TIMINGS)
+        if invalid_ti:
+            raise HTTPException(status_code=422, detail={"message": "قيم توقيت غير صالحة", "keys": invalid_ti})
+
+    saved = save_prefs(features=features_raw, targets=targets_raw, timings=timings_raw)
+    enabled_names = [FEATURES[key]["name"] for key, value in saved["features"].items() if value]
     add_notification(
         "تم حفظ تفضيلات ميزات AI"
         + (f": {', '.join(enabled_names)}" if enabled_names else " — جميعها متوقفة"),
@@ -173,6 +243,281 @@ async def api_features_update(request: Request, auth=Depends(check_auth)):
 async def api_notifications(auth=Depends(check_auth)):
     items = get_notifications()
     return {"notifications": items, "count": len(items)}
+
+
+@app.get("/api/match")
+async def api_match(auth=Depends(check_auth)):
+    analysis = get_last_analysis()
+    return {
+        "match": tracker.snapshot(),
+        "last_ai_analysis": analysis,
+        "statuses": feature_statuses(analysis, tracker.snapshot()["phase"]),
+    }
+
+
+def _modmenu_response():
+    cfg = load_config()
+    return {
+        "features": MODMENU_FEATURES,
+        "state": cfg["features"],
+        "enabled": get_modmenu_enabled(),
+        "updated_at": cfg["updated_at"],
+        "protocol": cfg["protocol"],
+        "notice": (
+            "المباراة ضد الكمبيوتر تُلعب على جهازك — هذه الإعدادات يقرأها "
+            "التطبيق المعدّل (IPA + dylib) ويطبّقها محلياً. البروكسي لا يعدّل "
+            "أي شيء لأن المباراة ليست على الشبكة."
+        ),
+    }
+
+
+@app.get("/api/modmenu")
+async def api_modmenu(auth=Depends(check_auth)):
+    return _modmenu_response()
+
+
+@app.post("/api/modmenu")
+async def api_modmenu_update(request: Request, auth=Depends(check_auth)):
+    try:
+        payload = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="JSON body مطلوب")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="يجب إرسال JSON object")
+
+    values = payload.get("features", payload)
+    if not isinstance(values, dict):
+        raise HTTPException(status_code=422, detail="features يجب أن تكون object")
+
+    unknown = sorted(set(values) - set(MODMENU_FEATURES))
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "ميزات مود مينو غير معروفة", "keys": unknown},
+        )
+    invalid = sorted(key for key, value in values.items() if type(value) is not bool)
+    if invalid:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "قيم الميزات يجب أن تكون true/false", "keys": invalid},
+        )
+
+    saved = save_modmenu(values)
+    enabled_names = [MODMENU_FEATURES[key]["name"] for key, value in saved["features"].items() if value]
+    add_notification(
+        "🛠️ تم حفظ إعدادات المود مينو"
+        + (f": {', '.join(enabled_names)}" if enabled_names else " — جميعها متوقفة"),
+        level="success",
+        enabled=get_modmenu_enabled(),
+    )
+    return _modmenu_response()
+
+
+@app.get("/api/modmenu/config")
+async def api_modmenu_config(auth=Depends(check_auth)):
+    """صيغة خفيفة للتطبيق المعدّل — يقرأها الـ dylib كل بضع ثوانٍ."""
+    return config_payload()
+
+
+def _netctl_response():
+    settings = load_settings()
+    return {
+        "settings": settings,
+        "sessions": active_sessions(),
+        "actions": get_actions(),
+        "temp_blocks": temp_blocks(),
+        "mode": "proxy_only",
+        "notice": (
+            "تحكمات شبكية بحتة تعمل عبر البروكسي فقط. لا يمكنها تغيير ذكاء AI "
+            "أو النتيجة داخل اللعبة (الآفلان محسوب على جهازك، والأونلاين مشفر "
+            "ومتحقق منه السيرفر). قطع الاتصال قد يُحتسب هزيمة أو إلغاء حسب "
+            "سياسة اللعبة."
+        ),
+    }
+
+
+@app.get("/api/netctl")
+async def api_netctl(auth=Depends(check_auth)):
+    return _netctl_response()
+
+
+@app.post("/api/netctl")
+async def api_netctl_update(request: Request, auth=Depends(check_auth)):
+    try:
+        payload = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="JSON body مطلوب")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="يجب إرسال JSON object")
+
+    values = payload.get("settings", payload)
+
+    if "throttle_kbps" in values:
+        try:
+            throttle = int(values["throttle_kbps"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="throttle_kbps يجب أن يكون رقماً")
+        if not (0 <= throttle <= 200_000):
+            raise HTTPException(status_code=422, detail="throttle_kbps بين 0 و 200000")
+
+    if "block_hosts" in values:
+        if not isinstance(values["block_hosts"], list):
+            raise HTTPException(status_code=422, detail="block_hosts يجب أن تكون قائمة")
+        if len(values["block_hosts"]) > 50:
+            raise HTTPException(status_code=422, detail="block_hosts بحد أقصى 50 نطاقاً")
+
+    if "result_guard" in values and type(values["result_guard"]) is not bool:
+        raise HTTPException(status_code=422, detail="result_guard يجب أن يكون true/false")
+
+    if "result_guard_scope" in values and values["result_guard_scope"] not in ("offline", "all"):
+        raise HTTPException(status_code=422, detail="result_guard_scope يجب أن يكون offline أو all")
+
+    if "block_matchmaking" in values and type(values["block_matchmaking"]) is not bool:
+        raise HTTPException(status_code=422, detail="block_matchmaking يجب أن يكون true/false")
+
+    if "auto_finish_sec" in values:
+        try:
+            auto_finish = int(values["auto_finish_sec"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="auto_finish_sec يجب أن يكون رقماً")
+        if not (0 <= auto_finish <= 3600):
+            raise HTTPException(status_code=422, detail="auto_finish_sec بين 0 و 3600")
+
+    if "jitter_ms" in values:
+        try:
+            jitter = int(values["jitter_ms"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="jitter_ms يجب أن يكون رقماً")
+        if not (0 <= jitter <= 2000):
+            raise HTTPException(status_code=422, detail="jitter_ms بين 0 و 2000")
+
+    saved = save_netctl(values)
+    add_notification(
+        "🎛️ حُدّثت إعدادات التحكم الشبكي",
+        level="info",
+        settings={k: saved[k] for k in ("throttle_kbps", "block_hosts", "result_guard")},
+    )
+    return _netctl_response()
+
+
+@app.post("/api/netctl/kill")
+async def api_netctl_kill(auth=Depends(check_auth)):
+    count = kill_all("طلب يدوي من اللوحة")
+    if count:
+        add_notification(f"🔌 قُطعت {count} اتصال نشط من لوحة التحكم", level="warning", killed=count)
+    return {"killed": count, "sessions": active_sessions()}
+
+
+@app.post("/api/netctl/finish")
+async def api_netctl_finish(request: Request, auth=Depends(check_auth)):
+    """⚡ إنهاء المباراة الآن: قطع + منع إعادة الاتصال لمدة كولداون."""
+    cooldown_sec = None
+    try:
+        payload = await request.json()
+        if isinstance(payload, dict):
+            cooldown_sec = payload.get("cooldown_sec")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        pass
+
+    if cooldown_sec is not None:
+        if type(cooldown_sec) is not int or not (0 <= cooldown_sec <= 3600):
+            raise HTTPException(
+                status_code=422,
+                detail="cooldown_sec يجب أن يكون رقماً صحيحاً بين 0 و 3600",
+            )
+
+    result = finish_match(cooldown_sec)
+    events = tracker.manual_finish()
+    for event in events:
+        add_notification(
+            f"⚽ {event['label']}",
+            level="warning",
+            category="finish",
+            phase=event["phase"],
+        )
+    add_notification(
+        "⚡ إنهاء المباراة — "
+        f"قُطعت {result['killed']} اتصالات وحُجب العودة لمدة {result['cooldown_sec']} ثانية",
+        level="warning",
+        killed=result["killed"],
+        blocked_hosts=result["blocked_hosts"][:5],
+        cooldown_sec=result["cooldown_sec"],
+    )
+    return {
+        **result,
+        "temp_blocks": temp_blocks(),
+        "sessions": active_sessions(),
+        "match": tracker.snapshot(),
+    }
+
+
+def _menu_text() -> str:
+    """مينو نصي للبروكسي — نفس الموقع بدون واجهة رسومية."""
+    settings = load_settings()
+    match = tracker.snapshot()
+    ai_state = load_features()
+    lines: list[str] = []
+
+    lines.append("=" * 46)
+    lines.append(f"⚡ eFootball Proxy Menu — v{VERSION}")
+    lines.append(f"   {VERSION_NAME}")
+    lines.append(f"   {TODAY} • الوضع: {match['mode_label']} • الطور: {match['phase_label']}")
+    lines.append("=" * 46)
+
+    lines.append("\n[1] تحكم الشبكة (يعمل عبر البروكسي مباشرة):")
+    on_off = lambda v: "ON" if v else "OFF"
+    lines.append(f"    🔌 قطع كل الاتصالات ....................: زر اللوحة أو POST /api/netctl/kill")
+    lines.append(f"    ⚡ إنهاء المباراة ......................: POST /api/netctl/finish")
+    lines.append(f"    🛡️  منع رفع النتيجة ....................: {on_off(settings['result_guard'])} (النطاق: {settings['result_guard_scope']})")
+    lines.append(f"    🚫 مانع المطابقة .......................: {on_off(settings['block_matchmaking'])}")
+    lines.append(f"    ⏰ مؤقّت المباراة ......................: {settings['auto_finish_sec']} ثانية ({'متوقف' if not settings['auto_finish_sec'] else 'نشط'})")
+    lines.append(f"    🐌 تحديد السرعة ........................: {settings['throttle_kbps']} KB/s")
+    lines.append(f"    📉 Jitter (تأخير عشوائي) ...............: {settings['jitter_ms']} ms")
+    lines.append(f"    📋 قائمة الحظر .........................: {len(settings['block_hosts'])} نطاق")
+    lines.append(f"    ⛔ منع العودة بعد الإنهاء ..............: {settings['finish_cooldown_sec']} ثانية")
+
+    lines.append("\n[2] ميزات AI (تفضيلات — الرصد يعمل، التعديل محجوب على TLS):")
+    for key, meta in AI_FEATURES.items():
+        status = "ON " if ai_state.get(key) else "OFF"
+        lines.append(f"    {status}  {meta['name']}")
+
+    blocks = temp_blocks()
+    lines.append("\n[3] الحجب المؤقت الحالي:")
+    if blocks:
+        for b in blocks:
+            lines.append(f"    ⛔ {b['host']} — {int(b['remaining'])} ثانية متبقية")
+    else:
+        lines.append("    لا شيء")
+
+    sessions = active_sessions()
+    lines.append("\n[4] اتصالات نشطة:")
+    if sessions:
+        for s in sessions:
+            lines.append(f"    🔗 {s['host']} ({int(s['age_sec'])} ث)")
+    else:
+        lines.append("    لا شيء")
+
+    lines.append("\n[5] الإشعارات الأخيرة:")
+    for item in get_notifications()[:5]:
+        lines.append(f"    [{item['level']}] {item['msg']} ({item['time']})")
+
+    lines.append("\n" + "=" * 46)
+    lines.append("لتغيير أي إعداد عبر curl (بدون الموقع):")
+    lines.append("  POST /api/netctl  {\"settings\":{\"block_matchmaking\":true}}")
+    lines.append("  POST /api/netctl  {\"settings\":{\"auto_finish_sec\":180}}")
+    lines.append("  POST /api/netctl/finish  {\"cooldown_sec\":120}")
+    lines.append("  POST /api/features  {\"kickoff_alert\":true}")
+    lines.append("  أضف ?token=YOUR_TOKEN إن فعّلت DASHBOARD_TOKEN")
+    lines.append("=" * 46)
+    return "\n".join(lines)
+
+
+@app.get("/menu", response_class=PlainTextResponse)
+async def api_menu(auth=Depends(check_auth)):
+    """مينو نصي للبروكسي — للاستخدام بدون لوحة رسومية."""
+    return _menu_text()
 
 
 @app.get("/api/export")
@@ -199,10 +544,8 @@ async def ws_live(ws: WebSocket):
     except WebSocketDisconnect:
         ws_manager.disconnect(ws)
 
-@app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, auth=Depends(check_auth)):
-    # نقل التوكن للواجهة
-    return templates.TemplateResponse(request, "index.html", {
+def _dashboard_context():
+    return {
         "stats": store.get_stats(),
         "logs": store.get_all(limit=50),
         "files": store.get_files()[:50],
@@ -214,23 +557,24 @@ async def dashboard(request: Request, auth=Depends(check_auth)):
         "version_name": VERSION_NAME,
         "ai_features": FEATURES,
         "enabled_features": load_features(),
+        "targets_def": TARGETS,
+        "timings_def": TIMINGS,
+        "prefs": load_prefs(),
+        "match": tracker.snapshot(),
         "notifications": get_notifications(),
-    })
+        "modmenu_features": MODMENU_FEATURES,
+        "modmenu_state": load_config()["features"],
+        "netctl_settings": load_settings(),
+        "netctl_sessions": active_sessions(),
+        "netctl_actions": get_actions(),
+        "netctl_temp_blocks": temp_blocks(),
+    }
+
+@app.get("/", response_class=HTMLResponse)
+async def dashboard(request: Request, auth=Depends(check_auth)):
+    return templates.TemplateResponse(request, "index.html", _dashboard_context())
 
 # صفحة بسيطة للهاتف
 @app.get("/m", response_class=HTMLResponse)
 async def mobile(request: Request, auth=Depends(check_auth)):
-    return templates.TemplateResponse(request, "index.html", {
-        "stats": store.get_stats(),
-        "logs": store.get_all(limit=30),
-        "files": store.get_files()[:30],
-        "grouped": store.get_grouped(),
-        "is_efootball_only": EFOOTBALL_ONLY,
-        "domains": EFOOTBALL_DOMAINS,
-        "today": TODAY,
-        "version": VERSION,
-        "version_name": VERSION_NAME,
-        "ai_features": FEATURES,
-        "enabled_features": load_features(),
-        "notifications": get_notifications(),
-    })
+    return templates.TemplateResponse(request, "index.html", _dashboard_context())

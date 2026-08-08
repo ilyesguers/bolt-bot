@@ -3,17 +3,61 @@ eFootball Analyzer - Hybrid Server v5.1
 يجمع Proxy + Web على نفس PORT - 1000x Better
 """
 import asyncio
+import random
 import threading
 import time
 import re
 import uvicorn
-from .config import PORT, BANNER, is_efootball_host, get_host_category, EFOOTBALL_ONLY
+from .config import PORT, BANNER, VERSION, is_efootball_host, get_host_category, EFOOTBALL_ONLY
 from .web import app
 from .logger import store
 from .advanced import analyze_payload_metadata
 from .max_decrypt import max_analyze, protection_max
 from .ai_analyzer import AIConnectionAnalyzer
-from .features import add_notification, get_enabled, is_ai_host
+from .features import (
+    add_notification,
+    feature_statuses,
+    get_enabled,
+    is_ai_host,
+    set_last_analysis,
+)
+from .match_tracker import PHASE_FULL_TIME, tracker
+from . import netctl
+
+def _notify_match_events(events):
+    """حوّل أحداث أطوار المباراة إلى إشعارات واضحة."""
+    for event in events:
+        if event.get("kind") == "mode":
+            add_notification(
+                f"🧭 {event['label']}",
+                level="info",
+                category="mode",
+                mode=event.get("mode"),
+            )
+            continue
+        add_notification(
+            f"⚽ تقدير المباراة: {event['label']}",
+            level="warning",
+            category="phase",
+            phase=event["phase"],
+        )
+
+
+def _maybe_auto_finish():
+    """⏰ مؤقّت المباراة: إن انقضت المدة من بداية المباراة → إنهاء تلقائي (مرة واحدة لكل مباراة)."""
+    if netctl.auto_finish_sec() <= 0:
+        return
+    snap = tracker.snapshot()
+    if snap["phase"] in ("idle", "full_time"):
+        return
+    if netctl.auto_finish_due(snap.get("session_kickoff_at") or snap["session_start"]):
+        result = netctl.finish_match()
+        add_notification(
+            f"⏰ مؤقّت المباراة: انقضت {netctl.auto_finish_sec()} ثانية — "
+            f"أُنهيت المباراة تلقائياً (قُطعت {result['killed']} اتصالات)",
+            level="warning",
+            category="auto_finish",
+        )
 
 async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     try:
@@ -67,12 +111,30 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
 
             ai_tracker = None
             if is_connect and is_ai_host(host):
+                snap = tracker.snapshot()
+                if netctl.result_guard_applies(host, snap["phase"], snap["mode"]):
+                    netctl.record_action("🛑 منع رفع النتيجة", f"أُسقط اتصال {host} بعد نهاية المباراة (تقديري)")
+                    add_notification(
+                        "🛑 منع رفع النتيجة — أُسقط اتصال مزامنة بعد نهاية المباراة (تقديري)",
+                        level="warning",
+                        host=host,
+                        mode="result_guard",
+                    )
+                    try:
+                        writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+                        await writer.drain()
+                    except Exception:
+                        pass
+                    writer.close()
+                    return
                 enabled_features = get_enabled()
                 ai_tracker = AIConnectionAnalyzer(
                     host,
                     enabled_features,
                     encrypted_tunnel=True,
                 )
+                _notify_match_events(tracker.connection_start(host))
+                _maybe_auto_finish()
                 add_notification(
                     "تم رصد اتصال خادم AI — تحليل TLS metadata بدون تعديل البايتات",
                     level="warning" if enabled_features else "info",
@@ -80,21 +142,56 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                     requested_features=enabled_features,
                 )
 
+            if host:
+                reason = netctl.block_reason(host)
+                if reason:
+                    labels = {"blocklist": "قائمة الحظر", "matchmaking": "مانع المطابقة", "cooldown_finish": "منع العودة بعد الإنهاء"}
+                    label = labels.get(reason, reason)
+                    netctl.record_action("🛡️ حجب نطاق", f"تم حجب الاتصال بـ {host}:{port} — {label}")
+                    add_notification(f"🛡️ حُجب الاتصال بـ {host} ({label})", level="warning", host=host, rule=reason)
+                    if should_log:
+                        store.add({"method": method, "host": host, "port": port, "target": target, "status": f"BLOCKED ({label})", "duration_ms": 0, "category": get_host_category(host), "clean_host": host.split(":")[0] if ":" in host else host})
+                    try:
+                        writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+                        await writer.drain()
+                    except Exception:
+                        pass
+                    writer.close()
+                    return
+
             if is_connect:
                 try:
                     remote_reader, remote_writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=5)
                     writer.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
                     await writer.drain()
+                    loop = asyncio.get_running_loop()
+                    session_id = netctl.register_session(writer, loop, host, port)
                     async def relay(r, w, direction):
                         nonlocal total_relay
+                        sent = 0
+                        start_t = time.monotonic()
                         try:
                             while True:
+                                if netctl.should_abort(session_id):
+                                    break
                                 chunk = await r.read(16384)
                                 if not chunk:
                                     break
                                 total_relay += len(chunk)
                                 if ai_tracker is not None:
                                     chunk = ai_tracker.process(chunk, direction)
+                                    _notify_match_events(tracker.chunk(direction, len(chunk)))
+                                    _maybe_auto_finish()
+                                cap_kbps = netctl.throttle_kbps()
+                                if cap_kbps > 0:
+                                    sent += len(chunk)
+                                    target = sent / (cap_kbps * 1024)
+                                    wait = target - (time.monotonic() - start_t)
+                                    if wait > 0:
+                                        await asyncio.sleep(wait)
+                                jitter = netctl.jitter_ms()
+                                if jitter > 0:
+                                    await asyncio.sleep(random.uniform(0, jitter) / 1000.0)
                                 w.write(chunk)
                                 await w.drain()
                         except:
@@ -108,7 +205,23 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                         relay(reader, remote_writer, "client_to_server"),
                         relay(remote_reader, writer, "server_to_client"),
                     )
+                    netctl.unregister_session(session_id)
                     ai_analysis = ai_tracker.result() if ai_tracker is not None else None
+                    if ai_tracker is not None:
+                        _notify_match_events(tracker.connection_end(host))
+                        set_last_analysis(ai_analysis)
+                        statuses = feature_statuses(ai_analysis, tracker.snapshot()["phase"])
+                        enabled_statuses = [s for s in statuses if s["enabled"]]
+                        if enabled_statuses:
+                            blocked = sum(1 for s in enabled_statuses if s["status"] in ("blocked_tls", "blocked_opponent", "ui_only"))
+                            active = sum(1 for s in enabled_statuses if s["status"] in ("active", "applied"))
+                            waiting = sum(1 for s in enabled_statuses if s["status"] == "wait_timing")
+                            add_notification(
+                                f"📋 تقرير ميزات AI: {active} نشطة/مطبّقة • {waiting} بانتظار التوقيت • {blocked} محجوبة (TLS/الخصم)",
+                                level="warning" if blocked else "success",
+                                host=host,
+                                statuses=[{s["key"]: s["status"]} for s in enabled_statuses],
+                            )
                     if should_log:
                         duration_ms = int((time.time()-start)*1000)
                         adv = analyze_payload_metadata(total_relay or len(data), duration_ms, tls_info["tls_version"] if tls_info else "TLSv1.3")
@@ -185,7 +298,7 @@ def start_web_in_thread():
 
 async def main():
     print(BANNER)
-    print(f"[MAIN] Hybrid on 0.0.0.0:{PORT} - AI Analyzer v5.1")
+    print(f"[MAIN] Hybrid on 0.0.0.0:{PORT} - v{VERSION} Proxy-Only Network Controls")
     t = threading.Thread(target=start_web_in_thread, daemon=True)
     t.start()
     await asyncio.sleep(2)

@@ -53,6 +53,85 @@ class FeatureStoreTests(unittest.TestCase):
         self.assertEqual(items[0]["msg"], "message-24")
         self.assertEqual(items[-1]["msg"], "message-15")
 
+    def test_prefs_save_and_round_trip_targets_and_timings(self):
+        saved = features.save_prefs(
+            features={"slow_ai": True},
+            targets={"slow_ai": "opponent"},
+            timings={"slow_ai": "late"},
+        )
+        self.assertTrue(saved["features"]["slow_ai"])
+        self.assertEqual(saved["targets"]["slow_ai"], "opponent")
+        self.assertEqual(saved["timings"]["slow_ai"], "late")
+        prefs = features.load_prefs()
+        self.assertEqual(prefs["targets"]["slow_ai"], "opponent")
+        self.assertEqual(prefs["timings"]["slow_ai"], "late")
+
+    def test_prefs_ignore_unknown_targets_and_timings(self):
+        saved = features.save_prefs(
+            features={"no_press": True},
+            targets={"no_press": "bogus", "unknown": "me"},
+            timings={"no_press": "midnight", "unknown": "late"},
+        )
+        self.assertEqual(saved["targets"]["no_press"], "opponent")  # القيمة الافتراضية للميزة
+        self.assertEqual(saved["timings"]["no_press"], "late")
+        self.assertNotIn("unknown", saved["targets"])
+
+    def test_feature_status_blocked_on_encrypted_tunnel(self):
+        status = features.feature_status(
+            "slow_ai",
+            analysis={"encrypted_transport": True},
+            phase="first_half",
+            enabled=True,
+            target="me",
+            timing="late",
+        )
+        self.assertEqual(status["status"], features.STATUS_BLOCKED_TLS)
+        self.assertIn("TLS", status["reason"])
+
+    def test_feature_status_opponent_is_unreachable_even_decoded(self):
+        status = features.feature_status(
+            "ai_miss",
+            analysis={"encrypted_transport": False},
+            phase="second_half",
+            enabled=True,
+            target="opponent",
+            timing="late",
+        )
+        self.assertEqual(status["status"], features.STATUS_BLOCKED_OPPONENT)
+
+    def test_detect_feature_active_by_timing_window(self):
+        # متأخر: غير مفعل في الشوط الأول
+        status = features.feature_status(
+            "match_end_alert",
+            analysis={"encrypted_transport": True},
+            phase="first_half",
+            enabled=True,
+            target="both",
+            timing="late",
+        )
+        self.assertEqual(status["status"], features.STATUS_WAIT_TIMING)
+        # مفعل في الشوط الثاني
+        status = features.feature_status(
+            "match_end_alert",
+            analysis={"encrypted_transport": True},
+            phase="second_half",
+            enabled=True,
+            target="both",
+            timing="late",
+        )
+        self.assertEqual(status["status"], features.STATUS_ACTIVE)
+
+    def test_disabled_feature_reports_disabled(self):
+        status = features.feature_status(
+            "server_ping",
+            analysis=None,
+            phase="second_half",
+            enabled=False,
+            target="both",
+            timing="any",
+        )
+        self.assertEqual(status["status"], features.STATUS_DISABLED)
+
 
 if __name__ == "__main__":
     unittest.main()
