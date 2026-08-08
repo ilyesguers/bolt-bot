@@ -18,7 +18,8 @@ from .features import (
     is_ai_host,
     set_last_analysis,
 )
-from .match_tracker import tracker
+from .match_tracker import PHASE_FULL_TIME, tracker
+from . import netctl
 
 def _notify_match_events(events):
     """حوّل أحداث أطوار المباراة إلى إشعارات واضحة."""
@@ -109,6 +110,21 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
 
         ai_tracker = None
         if is_connect and is_ai_host(host):
+            if netctl.get_setting("result_guard") and tracker.snapshot()["phase"] == PHASE_FULL_TIME:
+                netctl.record_action("🛑 منع رفع النتيجة", f"أُسقط اتصال {host} بعد نهاية المباراة (تقديري)")
+                add_notification(
+                    "🛑 منع رفع النتيجة — أُسقط اتصال مزامنة بعد نهاية المباراة (تقديري)",
+                    level="warning",
+                    host=host,
+                    mode="result_guard",
+                )
+                try:
+                    writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+                    await writer.drain()
+                except Exception:
+                    pass
+                writer.close()
+                return
             enabled_features = get_enabled()
             ai_tracker = AIConnectionAnalyzer(
                 host,
@@ -123,18 +139,37 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                 requested_features=enabled_features,
             )
 
+        if host and netctl.should_block(host):
+            netctl.record_action("🛡️ حجب نطاق", f"تم حجب الاتصال بـ {host}:{port} حسب قائمة الحظر")
+            add_notification(f"🛡️ حُجب الاتصال بـ {host}", level="warning", host=host, rule="blocklist")
+            if should_log:
+                store.add({"method": method, "host": host, "port": port, "target": target, "status": "BLOCKED (dashboard)", "duration_ms": 0})
+            try:
+                writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+                await writer.drain()
+            except Exception:
+                pass
+            writer.close()
+            return
+
         if is_connect:
             try:
                 remote_reader, remote_writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=5)
                 # حماية: نمرر بدون Via
                 writer.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
                 await writer.drain()
+                loop = asyncio.get_running_loop()
+                session_id = netctl.register_session(writer, loop, host, port)
 
                 # Relay مع عد البايتات لكشف التشفير الخاص - أقصى تحليل
                 async def relay_count(r, w, direction):
                     nonlocal total_relay
+                    sent = 0
+                    start_t = time.monotonic()
                     try:
                         while True:
+                            if netctl.should_abort(session_id):
+                                break
                             chunk = await r.read(16384)
                             if not chunk:
                                 break
@@ -142,6 +177,13 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                             if ai_tracker is not None:
                                 chunk = ai_tracker.process(chunk, direction)
                                 _notify_match_events(tracker.chunk(direction, len(chunk)))
+                            cap_kbps = netctl.throttle_kbps()
+                            if cap_kbps > 0:
+                                sent += len(chunk)
+                                target = sent / (cap_kbps * 1024)
+                                wait = target - (time.monotonic() - start_t)
+                                if wait > 0:
+                                    await asyncio.sleep(wait)
                             w.write(chunk)
                             await w.drain()
                     except:
@@ -155,6 +197,7 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                     relay_count(reader, remote_writer, "client_to_server"),
                     relay_count(remote_reader, writer, "server_to_client"),
                 )
+                netctl.unregister_session(session_id)
                 ai_analysis = ai_tracker.result() if ai_tracker is not None else None
                 if ai_tracker is not None:
                     _notify_match_events(tracker.connection_end(host))

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from src import features, modmenu
+from src import features, modmenu, netctl
 from src.web import app
 
 
@@ -12,9 +12,14 @@ class FeatureAPITests(unittest.TestCase):
     def setUp(self):
         self._original_file = features.DATA_FILE
         self._original_modmenu = modmenu.DATA_FILE
+        self._original_netctl = netctl.DATA_FILE
         self._temp_dir = tempfile.TemporaryDirectory()
         features.DATA_FILE = Path(self._temp_dir.name) / "features.json"
         modmenu.DATA_FILE = Path(self._temp_dir.name) / "modmenu.json"
+        netctl.DATA_FILE = Path(self._temp_dir.name) / "netctl.json"
+        netctl._settings = {"throttle_kbps": 0, "block_hosts": [], "result_guard": False}
+        netctl._sessions.clear()
+        netctl._actions.clear()
         features.notifications.clear()
         self.client = TestClient(app)
 
@@ -22,6 +27,9 @@ class FeatureAPITests(unittest.TestCase):
         self.client.close()
         features.DATA_FILE = self._original_file
         modmenu.DATA_FILE = self._original_modmenu
+        netctl.DATA_FILE = self._original_netctl
+        netctl._sessions.clear()
+        netctl._actions.clear()
         features.notifications.clear()
         self._temp_dir.cleanup()
 
@@ -112,11 +120,41 @@ class FeatureAPITests(unittest.TestCase):
         rejected = self.client.post("/api/modmenu", json={"bogus": True})
         self.assertEqual(rejected.status_code, 422)
 
-    def test_dashboard_contains_modmenu_panel(self):
+    def test_netctl_get_post_and_kill(self):
+        initial = self.client.get("/api/netctl")
+        self.assertEqual(initial.status_code, 200)
+        self.assertEqual(initial.json()["settings"]["throttle_kbps"], 0)
+        self.assertEqual(initial.json()["mode"], "proxy_only")
+
+        updated = self.client.post(
+            "/api/netctl",
+            json={"settings": {"throttle_kbps": 32, "block_hosts": ["konami.net"], "result_guard": True}},
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json()["settings"]["throttle_kbps"], 32)
+        self.assertTrue(updated.json()["settings"]["result_guard"])
+
+        rejected = self.client.post(
+            "/api/netctl", json={"settings": {"throttle_kbps": -1}}
+        )
+        self.assertEqual(rejected.status_code, 422)
+
+        rejected = self.client.post(
+            "/api/netctl", json={"settings": {"block_hosts": "not-a-list"}}
+        )
+        self.assertEqual(rejected.status_code, 422)
+
+        kill = self.client.post("/api/netctl/kill")
+        self.assertEqual(kill.status_code, 200)
+        self.assertIn("killed", kill.json())
+
+    def test_dashboard_contains_network_controls(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("🛠️ مود مينو", response.text)
-        self.assertEqual(response.text.count('class="modmenu-checkbox"'), 6)
+        self.assertIn("🎛️ تحكم الشبكة", response.text)
+        self.assertIn('id="throttleInput"', response.text)
+        self.assertIn('id="blockHostsInput"', response.text)
+        self.assertIn('id="resultGuardInput"', response.text)
 
 
 if __name__ == "__main__":

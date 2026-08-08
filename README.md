@@ -1,19 +1,36 @@
-# ⚡ eFootball Traffic Analyzer — v5.3
+# ⚡ eFootball Traffic Analyzer — v5.4
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-5.3.0-00E676?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-5.4.0-00E676?style=for-the-badge)
 ![Build](https://img.shields.io/badge/build-passing-2962FF?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-Railway%20%7C%20iPhone%2013-0A1433?style=for-the-badge)
 ![Date](https://img.shields.io/badge/date-2026--08--08-FFCA28?style=for-the-badge)
 
-**Proxy passthrough + Dashboard + AI-host traffic metadata + Feature Engine (target/timing) + Live Match Phase + Real Notifications + Offline AI Match Mode + Mod Menu Control**
+**Proxy passthrough + Dashboard + AI-host traffic metadata + Feature Engine (target/timing) + Live Match Phase + Real Notifications + Proxy-Only Network Controls**
 
 </div>
 
 ---
 
-## ما الجديد في v5.3
+## ما الجديد في v5.4 — تحكم شبكي عبر البروكسي فقط
+
+- **🎛️ لوحة "تحكم الشبكة"**: تعمل دون أي تعديل على جهازك (لا IPA، لا مود مينو):
+  - 🔌 **قطع كل الاتصالات** النشطة مع اللعبة فوراً (`POST /api/netctl/kill`)
+  - 🐌 **تحديد سرعة المرور** (حد أقصى KB/s لكل اتصال)
+  - 🛡️ **قائمة حجب النطاقات** (مطابقة لاحقة — مثلاً `konami.net`)
+  - 🛑 **منع رفع النتيجة** (تجريبي): يُسقط اتصالات خادم AI بعد نهاية المباراة
+- **سجل إجراءات الشبكة** + Toast فوري لكل إجراء (لا إجراءات صامتة).
+- **الصدق الكامل في الواجهة**: كل تحكم مكتوب مع أثره الحقيقي — لا شيء يدّعي
+  أنه يغيّر ذكاء AI أو النتيجة، لأن ذلك مستحيل عبر بروكسي (الآفلان محسوب على
+  جهازك، والأونلاين مشفر ومتحقق منه السيرفر). التفاصيل: `docs/NETWORK_CONTROLS.md`.
+- الإعدادات محفوظة في `data/netctl.json`.
+
+## ما الجديد في v5.3 (مسار اختياري — يتطلب IPA معدل)
+
+- 🛠️ مود مينو Client-Side (إنهاء فوراً/فوز تلقائي...) + كشف نمط المباراة
+  (آفلان/أونلاين) + قالب dylib. **غير متاح إذا كنت تستخدم بروكسي فقط** —
+  راجع `docs/OFFLINE_MOD_MENU.md`.
 
 - **فهم الوضع الصحيح للمباريات الآفلانية (ضد AI)**: المباراة ضد الكمبيوتر تُلعب بالكامل على جهازك — لا يمر شيء منها عبر البروكسي. لهذا الميزات "الأسطورية" (إنهاء فوراً، فوز تلقائي...) تنفذ **داخل التطبيق المعدّل (Client-Side)** وليس عبر البروكسي.
 - **🛠️ لوحة تحكم مود مينو** (`src/modmenu.py`): 6 مفاتيح Client-Side (إنهاء المباراة فوراً، فوز تلقائي، إبطاء AI محلي، AI يخطئ، ستامينا، قيم 99) تُحفظ في `data/modmenu.json`، والتطبيق المعدّل يقرأها من `GET /api/modmenu/config`.
@@ -116,6 +133,9 @@ python -m src.main
 | `GET /api/modmenu` | تعريفات المود مينو وحالته |
 | `POST /api/modmenu` | حفظ مفاتيح المود مينو (`{"features":{...}}`) |
 | `GET /api/modmenu/config` | صيغة خفيفة للتطبيق المعدّل (dylib) |
+| `GET /api/netctl` | إعدادات التحكم الشبكي + الجلسات + سجل الإجراءات |
+| `POST /api/netctl` | حفظ إعدادات التحكم الشبكي |
+| `POST /api/netctl/kill` | قطع كل الاتصالات النشطة |
 | `WS /ws/live` | تحديثات مباشرة (إحصائيات + سجلات + إشعارات + طور/نمط المباراة) |
 | `GET /api/export/csv` | تصدير CSV |
 
@@ -145,8 +165,9 @@ src/
   ai_analyzer.py      Bounded AI-host metadata analyzer
   match_tracker.py    Match phase/mode estimator (heuristic) + timing gate
   features.py         Preferences, targets/timings, per-feature status + notifications
-  modmenu.py          Client-side mod menu config for offline AI matches
-  web.py              FastAPI + feature/modmenu APIs
+  modmenu.py          Client-side mod menu config for offline AI matches (optional IPA path)
+  netctl.py           Proxy-only network controls: kill / throttle / block / result-guard
+  web.py              FastAPI + feature/modmenu/netctl APIs
   templates/index.html
-modmenu/ios_dylib/    ObjC template client (dylib) for the modified game
+modmenu/ios_dylib/    ObjC template client (dylib) for the modified game (optional)
 ```

@@ -17,6 +17,15 @@ from .logger import store
 from .analytics import compute_analytics
 from .auth import check_auth
 from .match_tracker import tracker
+from .netctl import (
+    active_sessions,
+    get_actions,
+    get_setting,
+    kill_all,
+    load_settings,
+    record_action,
+    save_settings as save_netctl,
+)
 from .modmenu import FEATURES as MODMENU_FEATURES
 from .modmenu import config_payload, get_enabled as get_modmenu_enabled
 from .modmenu import load_config, save_config as save_modmenu
@@ -304,6 +313,73 @@ async def api_modmenu_config(auth=Depends(check_auth)):
     return config_payload()
 
 
+def _netctl_response():
+    settings = load_settings()
+    return {
+        "settings": settings,
+        "sessions": active_sessions(),
+        "actions": get_actions(),
+        "mode": "proxy_only",
+        "notice": (
+            "تحكمات شبكية بحتة تعمل عبر البروكسي فقط. لا يمكنها تغيير ذكاء AI "
+            "أو النتيجة داخل اللعبة (الآفلان محسوب على جهازك، والأونلاين مشفر "
+            "ومتحقق منه السيرفر). قطع الاتصال قد يُحتسب هزيمة أو إلغاء حسب "
+            "سياسة اللعبة."
+        ),
+    }
+
+
+@app.get("/api/netctl")
+async def api_netctl(auth=Depends(check_auth)):
+    return _netctl_response()
+
+
+@app.post("/api/netctl")
+async def api_netctl_update(request: Request, auth=Depends(check_auth)):
+    try:
+        payload = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="JSON body مطلوب")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="يجب إرسال JSON object")
+
+    values = payload.get("settings", payload)
+
+    if "throttle_kbps" in values:
+        try:
+            throttle = int(values["throttle_kbps"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="throttle_kbps يجب أن يكون رقماً")
+        if not (0 <= throttle <= 200_000):
+            raise HTTPException(status_code=422, detail="throttle_kbps بين 0 و 200000")
+
+    if "block_hosts" in values:
+        if not isinstance(values["block_hosts"], list):
+            raise HTTPException(status_code=422, detail="block_hosts يجب أن تكون قائمة")
+        if len(values["block_hosts"]) > 50:
+            raise HTTPException(status_code=422, detail="block_hosts بحد أقصى 50 نطاقاً")
+
+    if "result_guard" in values and type(values["result_guard"]) is not bool:
+        raise HTTPException(status_code=422, detail="result_guard يجب أن يكون true/false")
+
+    saved = save_netctl(values)
+    add_notification(
+        "🎛️ حُدّثت إعدادات التحكم الشبكي",
+        level="info",
+        settings={k: saved[k] for k in ("throttle_kbps", "block_hosts", "result_guard")},
+    )
+    return _netctl_response()
+
+
+@app.post("/api/netctl/kill")
+async def api_netctl_kill(auth=Depends(check_auth)):
+    count = kill_all("طلب يدوي من اللوحة")
+    if count:
+        add_notification(f"🔌 قُطعت {count} اتصال نشط من لوحة التحكم", level="warning", killed=count)
+    return {"killed": count, "sessions": active_sessions()}
+
+
 @app.get("/api/export")
 async def api_export(auth=Depends(check_auth)):
     return {"export_date": TODAY, "version": VERSION, "logs": store.get_all(limit=800), "stats": store.get_stats()}
@@ -348,6 +424,9 @@ def _dashboard_context():
         "notifications": get_notifications(),
         "modmenu_features": MODMENU_FEATURES,
         "modmenu_state": load_config()["features"],
+        "netctl_settings": load_settings(),
+        "netctl_sessions": active_sessions(),
+        "netctl_actions": get_actions(),
     }
 
 @app.get("/", response_class=HTMLResponse)

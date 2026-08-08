@@ -93,6 +93,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .match-phase { font-size:13px; font-weight:900; color:#4fc3f7; }
 .match-chip { font-size:9px; color:var(--muted); background:rgba(10,20,51,.8); border:1px solid var(--border); padding:3px 9px; border-radius:14px; }
 .match-timeline { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+.netctl-row { display:flex; align-items:center; gap:10px; padding:8px 2px; border-bottom:1px dashed var(--border); margin-bottom:8px; }
 .match-timeline span { font-size:8px; color:#b0bec5; background:rgba(10,20,51,.8); border:1px solid var(--border); padding:2px 8px; border-radius:10px; }
 .feature-opts { display:flex; gap:6px; margin-top:7px; flex-wrap:wrap; }
 .feature-opts select { background:rgba(5,10,31,.9); border:1px solid var(--border); color:var(--text); padding:4px 6px; border-radius:8px; font-size:9px; max-width:130px; }
@@ -211,31 +212,57 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
     </div>
   </div>
 </section>
-<section class="ai-panel" style="border-color:rgba(0,230,118,.35);" aria-labelledby="modmenu-panel-title">
+<section class="ai-panel" style="border-color:rgba(255,202,40,.35);" aria-labelledby="netctl-panel-title">
   <div class="ai-panel-head">
     <div>
-      <div class="ai-panel-title" id="modmenu-panel-title">🛠️ مود مينو — مباريات الآفلان ضد AI</div>
-      <div class="ai-panel-subtitle">Client-Side • التطبيق المعدّل يقرأ الإعدادات من <code style="color:var(--accent);">/api/modmenu/config</code> • محفوظة في data/modmenu.json</div>
+      <div class="ai-panel-title" id="netctl-panel-title">🎛️ تحكم الشبكة — بروكسي فقط</div>
+      <div class="ai-panel-subtitle">قطع الاتصال • تحديد السرعة • حجب النطاقات • منع رفع النتيجة — كلها تعمل على مستوى الشبكة دون أي تعديل على جهازك</div>
     </div>
-    <span class="badge badge-green">Client-Side Only</span>
+    <span class="badge badge-gold">Proxy-Only</span>
   </div>
-  <div class="ai-notice">💡 <b>ليه هذه الميزات تشتغل هنا والبروكسي ما يقدر؟</b> مباراة الكمبيوتر تُلعب بالكامل <b>على جهازك</b> (القرارات والنتيجة محلية، والسيرفر ما يتحقق من كل لحظة) — لهذا تنفع الميزات الأسطورية (إنهاء فوراً، فوز تلقائي، AI بطيء...). لكن تطبيقها يتم <b>داخل اللعبة المعدّلة</b> (IPA معدل + حقنة dylib) وليس عبر البروكسي. اللوحة هنا هي جهاز التحكم: شغّل الميزة، والتطبيق المعدّل يقرأها تلقائياً. بدون تطبيق معدل، هذه المفاتيح لا تؤثر في اللعبة الأصلية — شغل الإشعارات لتعرف وقت التفعيل.</div>
-  <div class="ai-feature-grid" id="modMenuGrid">
-    {% for key, feature in modmenu_features.items() %}
-    <label class="ai-feature" for="modmenu-{{ key }}">
-      <input class="modmenu-checkbox" type="checkbox" id="modmenu-{{ key }}" data-modmenu="{{ key }}" {% if modmenu_state.get(key) %}checked{% endif %}>
-      <span class="ai-feature-icon">{{ feature.icon }}</span>
-      <span>
-        <span class="ai-feature-name">{{ feature.name }}</span>
-        <span class="ai-feature-desc">{{ feature.desc }}</span>
-      </span>
-      <span class="ai-risk">{{ feature.risk }}</span>
-    </label>
-    {% endfor %}
-  </div>
-  <div class="ai-actions">
-    <button class="btn btn-success" id="saveModMenuBtn" onclick="saveModMenu()">💾 حفظ المود مينو</button>
-    <span class="ai-save-status" id="modMenuStatus">جاهز</span>
+  <div class="ai-notice">⚠️ <b>الصدق الكامل:</b> هذه التحكمات شبكية بحتة — لا يمكنها تغيير ذكاء AI أو النتيجة داخل اللعبة (الآفلان محسوب على جهازك والسيرفر يتحقق من الأونلاين). <b>قطع الاتصال</b> قد يُحتسب هزيمة أو إلغاء حسب سياسة اللعبة، <b>تحديد السرعة</b> قد يضيف تأخيراً عليك أنت، و<b>منع رفع النتيجة</b> تقديري وقد يمنع المكافآت أيضاً. استخدمها بوعي.</div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,1fr);gap:12px;">
+    <div>
+      <div class="netctl-row">
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:900;color:var(--text);">🐌 تحديد سرعة المرور (KB/s لكل اتصال)</div>
+          <div style="font-size:9px;color:var(--muted);">0 = بدون تحديد. يبطّئ نقل البيانات بين اللعبة والخادم.</div>
+        </div>
+        <input id="throttleInput" type="number" min="0" max="200000" value="{{ netctl_settings.throttle_kbps }}" style="width:90px;background:rgba(5,10,31,.9);border:1px solid var(--border);color:var(--text);padding:7px;border-radius:8px;">
+      </div>
+      <div class="netctl-row">
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:900;color:var(--text);">🛡️ قائمة حجب النطاقات (سطر لكل نطاق)</div>
+          <div style="font-size:9px;color:var(--muted);">أمثلة: konami.net، analytics.konami.com — يُرفض أي اتصال بها.</div>
+        </div>
+      </div>
+      <textarea id="blockHostsInput" rows="3" style="width:100%;background:rgba(5,10,31,.9);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;font-size:10px;">{{ netctl_settings.block_hosts | join('\n') }}</textarea>
+      <label class="netctl-row" style="cursor:pointer;margin-top:10px;">
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:900;color:var(--text);">🛑 منع رفع النتيجة بعد نهاية المباراة <span style="color:var(--gold);">(تجريبي)</span></div>
+          <div style="font-size:9px;color:var(--muted);">يُسقط اتصالات خادم AI التي تظهر بعد "نهاية المباراة" — قد يمنع تسجيل الخسارة لكن قد يمنع المكافآت أيضاً.</div>
+        </div>
+        <input id="resultGuardInput" type="checkbox" {% if netctl_settings.result_guard %}checked{% endif %} style="width:18px;height:18px;accent-color:#ffca28;">
+      </label>
+      <div class="ai-actions">
+        <button class="btn btn-primary" id="saveNetCtlBtn" onclick="saveNetCtl()">💾 حفظ التحكم</button>
+        <button class="btn btn-danger" onclick="killAll()">🔌 قطع كل الاتصالات</button>
+        <span class="ai-save-status" id="netCtlStatus">جاهز</span>
+      </div>
+      <div style="margin-top:10px;font-size:10px;color:var(--muted);">اتصالات نشطة الآن: <b id="activeCount" style="color:var(--accent);">{{ netctl_sessions | length }}</b></div>
+    </div>
+    <div class="ai-notifications" style="max-height:300px;">
+      <h4>📋 سجل إجراءات الشبكة</h4>
+      <div id="netCtlActions">
+        {% if netctl_actions %}
+          {% for item in netctl_actions %}
+          <div class="ai-notification"><div>{{ item.msg }}</div><div style="color:var(--muted);font-size:9px;margin-top:2px;">{{ item.detail }} • {{ item.time }}</div></div>
+          {% endfor %}
+        {% else %}
+          <div style="color:var(--muted);font-size:10px;">لا إجراءات بعد.</div>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </section>
 <div id="toastBox"></div>
@@ -494,40 +521,59 @@ function renderMatchPhase(match){
   el('matchBytes').textContent = (match.server_bytes||0) + 'B ⬇ / ' + (match.client_bytes||0) + 'B ⬆';
   el('matchTimeline').innerHTML = (match.timeline||[]).map(e=>`<span>${e.kind==='mode'?'🧭':'⚽'} ${escapeHTML(e.label)} • ${new Date(e.timestamp*1000).toLocaleTimeString('ar-DZ')}</span>`).join('');
 }
-async function loadModMenu(){
+async function loadNetCtl(){
   try{
-    const response = await apiFetch('/api/modmenu');
-    if(!response.ok) throw new Error('تعذر تحميل المود مينو');
+    const response = await apiFetch('/api/netctl');
+    if(!response.ok) throw new Error('تعذر تحميل إعدادات الشبكة');
     const data = await response.json();
-    document.querySelectorAll('.modmenu-checkbox').forEach(input=>{
-      input.checked = data.state?.[input.dataset.modmenu] === true;
-    });
+    document.getElementById('throttleInput').value = data.settings.throttle_kbps;
+    document.getElementById('blockHostsInput').value = (data.settings.block_hosts||[]).join('\n');
+    document.getElementById('resultGuardInput').checked = data.settings.result_guard === true;
+    renderNetCtlActions(data.actions||[]);
+    document.getElementById('activeCount').textContent = data.sessions.length;
   }catch(error){
-    document.getElementById('modMenuStatus').textContent = error.message || 'تعذر تحميل المود مينو';
+    document.getElementById('netCtlStatus').textContent = error.message || 'تعذر التحميل';
   }
 }
-async function saveModMenu(){
-  const button = document.getElementById('saveModMenuBtn');
-  const status = document.getElementById('modMenuStatus');
-  const state = {};
-  document.querySelectorAll('.modmenu-checkbox').forEach(input=>state[input.dataset.modmenu]=input.checked);
+async function saveNetCtl(){
+  const button = document.getElementById('saveNetCtlBtn');
+  const status = document.getElementById('netCtlStatus');
+  const throttle = parseInt(document.getElementById('throttleInput').value, 10) || 0;
+  const blockHosts = document.getElementById('blockHostsInput').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const resultGuard = document.getElementById('resultGuardInput').checked;
   button.disabled = true;
   status.textContent = 'جارٍ الحفظ...';
   try{
-    const response = await apiFetch('/api/modmenu', {
+    const response = await apiFetch('/api/netctl', {
       method:'POST',
       headers:{'content-type':'application/json'},
-      body:JSON.stringify({features:state})
+      body:JSON.stringify({settings:{throttle_kbps:throttle, block_hosts:blockHosts, result_guard:resultGuard}})
     });
     const data = await response.json();
-    if(!response.ok) throw new Error(typeof data.detail==='string' ? data.detail : 'فشل حفظ المود مينو');
-    status.textContent = '✓ حُفظت — التطبيق المعدّل يقرأها الآن';
+    if(!response.ok) throw new Error(typeof data.detail==='string' ? data.detail : 'فشل الحفظ');
+    status.textContent = '✓ حُفظت إعدادات الشبكة';
+    renderNetCtlActions(data.actions||[]);
+    document.getElementById('activeCount').textContent = data.sessions.length;
     await refreshNotifications();
   }catch(error){
     status.textContent = '✕ ' + (error.message || 'فشل الحفظ');
   }finally{
     button.disabled = false;
   }
+}
+async function killAll(){
+  if(!confirm('قطع كل الاتصالات النشطة الآن؟ قد يُحتسب انقطاعاً أو هزيمة حسب سياسة اللعبة.')) return;
+  try{
+    const data = await apiFetch('/api/netctl/kill', {method:'POST'}).then(r=>r.json());
+    showToast({level:'warning', msg:'🔌 قُطعت ' + (data.killed||0) + ' اتصال نشط', time:new Date().toLocaleTimeString('ar-DZ')});
+    document.getElementById('activeCount').textContent = data.sessions.length;
+    await refreshNotifications();
+  }catch{}
+}
+function renderNetCtlActions(items){
+  const c = document.getElementById('netCtlActions');
+  if(!items || !items.length){ c.innerHTML='<div style="color:var(--muted);font-size:10px;">لا إجراءات بعد.</div>'; return; }
+  c.innerHTML = items.map(item=>`<div class="ai-notification"><div>${escapeHTML(item.msg)}</div><div style="color:var(--muted);font-size:9px;margin-top:2px;">${escapeHTML(item.detail)} • ${escapeHTML(item.time)}</div></div>`).join('');
 }
 function renderLogs(logs){
   const c=document.getElementById('logs');
@@ -573,7 +619,7 @@ async function exportJSON(){ const r=await apiFetch('/api/export'); const j=awai
 async function exportCSV(){ location.href=apiUrl('/api/export/csv'); }
 function toggleAuto(){ auto=!auto; const btn=document.getElementById('autoBtn'); if(auto){ clearInterval(timer); timer=setInterval(fetchAll,2500); btn.textContent='⏸️ تلقائي'; } else { clearInterval(timer); btn.textContent='▶️ تشغيل'; } }
 loadAIFeatures();
-loadModMenu();
+loadNetCtl();
 fetchAll();
 </script>
 </body>

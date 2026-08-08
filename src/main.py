@@ -20,7 +20,8 @@ from .features import (
     is_ai_host,
     set_last_analysis,
 )
-from .match_tracker import tracker
+from .match_tracker import PHASE_FULL_TIME, tracker
+from . import netctl
 
 def _notify_match_events(events):
     """حوّل أحداث أطوار المباراة إلى إشعارات واضحة."""
@@ -92,6 +93,21 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
 
             ai_tracker = None
             if is_connect and is_ai_host(host):
+                if netctl.get_setting("result_guard") and tracker.snapshot()["phase"] == PHASE_FULL_TIME:
+                    netctl.record_action("🛑 منع رفع النتيجة", f"أُسقط اتصال {host} بعد نهاية المباراة (تقديري)")
+                    add_notification(
+                        "🛑 منع رفع النتيجة — أُسقط اتصال مزامنة بعد نهاية المباراة (تقديري)",
+                        level="warning",
+                        host=host,
+                        mode="result_guard",
+                    )
+                    try:
+                        writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+                        await writer.drain()
+                    except Exception:
+                        pass
+                    writer.close()
+                    return
                 enabled_features = get_enabled()
                 ai_tracker = AIConnectionAnalyzer(
                     host,
@@ -106,15 +122,34 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                     requested_features=enabled_features,
                 )
 
+            if host and netctl.should_block(host):
+                netctl.record_action("🛡️ حجب نطاق", f"تم حجب الاتصال بـ {host}:{port} حسب قائمة الحظر")
+                add_notification(f"🛡️ حُجب الاتصال بـ {host}", level="warning", host=host, rule="blocklist")
+                if should_log:
+                    store.add({"method": method, "host": host, "port": port, "target": target, "status": "BLOCKED (dashboard)", "duration_ms": 0, "category": get_host_category(host), "clean_host": host.split(":")[0] if ":" in host else host})
+                try:
+                    writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+                    await writer.drain()
+                except Exception:
+                    pass
+                writer.close()
+                return
+
             if is_connect:
                 try:
                     remote_reader, remote_writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=5)
                     writer.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
                     await writer.drain()
+                    loop = asyncio.get_running_loop()
+                    session_id = netctl.register_session(writer, loop, host, port)
                     async def relay(r, w, direction):
                         nonlocal total_relay
+                        sent = 0
+                        start_t = time.monotonic()
                         try:
                             while True:
+                                if netctl.should_abort(session_id):
+                                    break
                                 chunk = await r.read(16384)
                                 if not chunk:
                                     break
@@ -122,6 +157,13 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                                 if ai_tracker is not None:
                                     chunk = ai_tracker.process(chunk, direction)
                                     _notify_match_events(tracker.chunk(direction, len(chunk)))
+                                cap_kbps = netctl.throttle_kbps()
+                                if cap_kbps > 0:
+                                    sent += len(chunk)
+                                    target = sent / (cap_kbps * 1024)
+                                    wait = target - (time.monotonic() - start_t)
+                                    if wait > 0:
+                                        await asyncio.sleep(wait)
                                 w.write(chunk)
                                 await w.drain()
                         except:
@@ -135,6 +177,7 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                         relay(reader, remote_writer, "client_to_server"),
                         relay(remote_reader, writer, "server_to_client"),
                     )
+                    netctl.unregister_session(session_id)
                     ai_analysis = ai_tracker.result() if ai_tracker is not None else None
                     if ai_tracker is not None:
                         _notify_match_events(tracker.connection_end(host))
@@ -227,7 +270,7 @@ def start_web_in_thread():
 
 async def main():
     print(BANNER)
-    print(f"[MAIN] Hybrid on 0.0.0.0:{PORT} - AI Analyzer v5.1")
+    print(f"[MAIN] Hybrid on 0.0.0.0:{PORT} - v{VERSION} Proxy-Only Network Controls")
     t = threading.Thread(target=start_web_in_thread, daemon=True)
     t.start()
     await asyncio.sleep(2)

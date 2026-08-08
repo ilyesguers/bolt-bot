@@ -6,8 +6,8 @@ v5.1 - AI Traffic Metadata + Feature Controls
 import os
 
 TODAY = "2026-08-08"
-VERSION = "5.3.0"
-VERSION_NAME = "Offline AI Match Mode + Mod Menu Control + Mode Detection"
+VERSION = "5.4.0"
+VERSION_NAME = "Proxy-Only Network Controls (kill / throttle / block / result-guard)"
 TIMEZONE = "Africa/Algiers"
 PORT = int(os.environ.get("PORT", "8080"))
 LOG_LIMIT = int(os.environ.get("LOG_LIMIT", "800"))
