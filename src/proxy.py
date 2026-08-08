@@ -1,7 +1,6 @@
 """
-محرك البروكسي الشفاف - Transparent Tunnel + Advanced Decrypt & Protection
-يكتشف حقاً ماذا يدور بين السيرفر واللعبة (تشفير خاص)
-2026-08-07 - v4.1 Advanced
+محرك البروكسي الشفاف - Transparent Tunnel
+نفق تمرير + رصد ميتاداتا فقط، بدون بيانات مُختلقة.
 """
 import asyncio
 import random
@@ -9,8 +8,6 @@ import time
 import re
 from .config import PORT
 from .logger import store
-from .advanced import analyze_payload_metadata, protection_headers
-from .max_decrypt import max_analyze, protection_max
 from .ai_analyzer import AIConnectionAnalyzer
 from .features import (
     add_notification,
@@ -112,19 +109,6 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                         break
         from .config import is_efootball_host, EFOOTBALL_ONLY
         should_log = (not EFOOTBALL_ONLY) or is_efootball_host(host)
-        tls_info = None
-        if port in (443, 8443):
-            tls_info = {
-                "host": host,
-                "sni": host,
-                "status": "ok",
-                "tls_version": "TLSv1.3",
-                "cipher": {"name": "TLS_AES_256_GCM_SHA384", "bits": 256},
-                "modern_score": 94,
-                "cert": {"subject": host, "issuer": "KONAMI Secure CA", "notBefore": "2026-01-01", "notAfter": "2027-01-01", "san": [host]},
-            }
-        # protection - لا نضيف أي رأس يكشفنا
-        prot = protection_headers()
 
         ai_tracker = None
         if is_connect and is_ai_host(host):
@@ -162,10 +146,10 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
         if host:
             reason = netctl.block_reason(host)
             if reason:
-                labels = {"blocklist": "قائمة الحظر", "matchmaking": "مانع المطابقة", "cooldown_finish": "منع العودة بعد الإنهاء"}
-                label = labels.get(reason, reason)
-                netctl.record_action("🛡️ حجب نطاق", f"تم حجب الاتصال بـ {host}:{port} — {label}")
-                add_notification(f"🛡️ حُجب الاتصال بـ {host} ({label})", level="warning", host=host, rule=reason)
+                    labels = {"blocklist": "قائمة الحظر", "matchmaking": "مانع المطابقة", "cooldown_finish": "منع العودة بعد الإنهاء"}
+                    label = labels.get(reason, reason)
+                    netctl.record_action("🛡️ حجب نطاق", f"تم حجب الاتصال بـ {host}:{port} — {label}", dedup_sec=netctl.DEFAULT_DEDUP_SEC)
+                    add_notification(f"🛡️ حُجب الاتصال بـ {host} ({label})", level="warning", host=host, rule=reason)
                 if should_log:
                     store.add({"method": method, "host": host, "port": port, "target": target, "status": f"BLOCKED ({label})", "duration_ms": 0})
                 try:
@@ -244,8 +228,6 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                         )
                 duration_ms = int((time.time() - start) * 1000)
                 if should_log:
-                    adv = analyze_payload_metadata(total_relay or len(data), duration_ms, tls_info["tls_version"] if tls_info else "TLSv1.3")
-                    max_adv = max_analyze(host, total_relay or len(data), duration_ms, "tunnel")
                     entry = {
                         "method": method,
                         "host": host,
@@ -253,11 +235,6 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                         "target": target,
                         "status": "TUNNEL OK",
                         "duration_ms": duration_ms,
-                        "cert_info": tls_info.get("cert") if tls_info else None,
-                        "tls_info": tls_info,
-                        "advanced": adv,
-                        "max_decrypt": max_adv,
-                        "protection": protection_max(),
                         "bytes_client": len(data),
                         "bytes_relay": total_relay,
                         "ai_analysis": ai_analysis,
@@ -266,8 +243,7 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                 return
             except Exception as e:
                 if should_log:
-                    adv = analyze_payload_metadata(len(data), int((time.time()-start)*1000), "TLSv1.3")
-                    store.add({"method": method, "host": host or target, "port": port, "target": target, "status": f"FAILED: {str(e)[:60]}", "duration_ms": int((time.time() - start)*1000), "tls_info": tls_info, "advanced": adv, "protection": prot})
+                    store.add({"method": method, "host": host or target, "port": port, "target": target, "status": f"FAILED: {str(e)[:60]}", "duration_ms": int((time.time() - start)*1000)})
                 try:
                     writer.write(f"HTTP/1.1 502 Bad Gateway\r\n\r\n{str(e)[:100]}".encode())
                     await writer.drain()
@@ -297,12 +273,10 @@ async def handle_proxy_client(reader: asyncio.StreamReader, writer: asyncio.Stre
                 remote_writer.close()
                 writer.close()
                 if should_log:
-                    adv = analyze_payload_metadata(total_bytes or len(data), int((time.time()-start)*1000), tls_info["tls_version"] if tls_info else "TLSv1.3")
-                    max_adv = max_analyze(host, total_bytes or len(data), int((time.time()-start)*1000), "http")
-                    store.add({"method": method, "host": host, "port": port, "target": target, "status": f"HTTP {total_bytes} bytes", "duration_ms": int((time.time() - start)*1000), "tls_info": tls_info, "advanced": adv, "max_decrypt": max_adv, "protection": protection_max()})
+                    store.add({"method": method, "host": host, "port": port, "target": target, "status": f"HTTP {total_bytes} bytes", "duration_ms": int((time.time() - start)*1000)})
             except Exception as e:
                 if should_log:
-                    store.add({"method": method, "host": host or target, "port": port, "target": target, "status": f"HTTP FAILED: {str(e)[:60]}", "duration_ms": int((time.time() - start)*1000), "tls_info": tls_info})
+                    store.add({"method": method, "host": host or target, "port": port, "target": target, "status": f"HTTP FAILED: {str(e)[:60]}", "duration_ms": int((time.time() - start)*1000)})
                 try:
                     writer.write(b"HTTP/1.1 502 Bad Gateway\r\n\r\n")
                     await writer.drain()

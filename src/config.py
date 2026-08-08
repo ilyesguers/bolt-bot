@@ -6,8 +6,8 @@ v5.1 - AI Traffic Metadata + Feature Controls
 import os
 
 TODAY = "2026-08-08"
-VERSION = "5.6.0"
-VERSION_NAME = "Matchmaking Blocker + Match Timer + Jitter + Result-Guard Scope + Proxy Text Menu"
+VERSION = "5.7.0"
+VERSION_NAME = "إنهاء يخص اللعبة فقط + حماية دومين اللوحة + إشعارات بلا تكرار"
 TIMEZONE = "Africa/Algiers"
 PORT = int(os.environ.get("PORT", "8080"))
 LOG_LIMIT = int(os.environ.get("LOG_LIMIT", "800"))

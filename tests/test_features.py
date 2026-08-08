@@ -12,10 +12,12 @@ class FeatureStoreTests(unittest.TestCase):
         self._temp_dir = tempfile.TemporaryDirectory()
         features.DATA_FILE = Path(self._temp_dir.name) / "features.json"
         features.notifications.clear()
+        features._recent_notifications.clear()
 
     def tearDown(self):
         features.DATA_FILE = self._original_file
         features.notifications.clear()
+        features._recent_notifications.clear()
         self._temp_dir.cleanup()
 
     def test_defaults_include_every_known_feature(self):
@@ -44,6 +46,15 @@ class FeatureStoreTests(unittest.TestCase):
         state = features.load_features()
         self.assertNotIn("unknown", state)
         self.assertTrue(state["slow_ai"])
+
+    def test_duplicate_notification_is_suppressed_within_window(self):
+        # نفس الإشعار كل ثانية (إعادات محاولة اللعبة) → يظهر مرة واحدة فقط
+        for _ in range(5):
+            features.add_notification("🛡️ حُجب الاتصال بـ pes22-game.cs.konami.net (منع العودة بعد الإنهاء)")
+        self.assertEqual(len(features.get_notifications()), 1)
+        # إشعار مختلف يمرّ
+        features.add_notification("⚽ تقدير المباراة: بداية")
+        self.assertEqual(len(features.get_notifications()), 2)
 
     def test_notifications_are_bounded_and_newest_first(self):
         for number in range(25):

@@ -139,7 +139,7 @@ async def api_config(auth=Depends(check_auth)):
         "version": VERSION,
         "version_name": VERSION_NAME,
         "today": TODAY,
-        "features": ["Live WebSocket","Persistent Storage","Analytics Charts","File Organization","Modern Decrypt","Auto Update","CSV Export","Auth","Match Phase Estimator","Feature Status"],
+        "features": ["Live WebSocket","Persistent Storage","Analytics Charts","File Organization","CSV Export","Auth","Match Phase Estimator","Feature Status","Self-Domain Protection"],
     }
 
 

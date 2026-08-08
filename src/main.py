@@ -1,6 +1,6 @@
 """
-eFootball Analyzer - Hybrid Server v5.1
-يجمع Proxy + Web على نفس PORT - 1000x Better
+eFootball Analyzer - Hybrid Server
+يجمع Proxy + Web على نفس PORT — رصد وتحكم شبكي فقط، بدون بيانات مُختلقة.
 """
 import asyncio
 import random
@@ -11,8 +11,6 @@ import uvicorn
 from .config import PORT, BANNER, VERSION, is_efootball_host, get_host_category, EFOOTBALL_ONLY
 from .web import app
 from .logger import store
-from .advanced import analyze_payload_metadata
-from .max_decrypt import max_analyze, protection_max
 from .ai_analyzer import AIConnectionAnalyzer
 from .features import (
     add_notification,
@@ -104,10 +102,6 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
             should_log = (not EFOOTBALL_ONLY) or is_efootball_host(host or target)
             start = time.time()
             total_relay = 0
-            tls_info = None
-            if port in (443, 8443):
-                tls_info = {"host": host, "sni": host, "status": "ok", "tls_version": "TLSv1.3", "cipher": {"name": "TLS_AES_256_GCM_SHA384", "bits": 256}, "modern_score": 96, "cert": {"subject": host, "issuer": "KONAMI Secure CA", "notBefore": "2026-01-01", "notAfter": "2027-01-01", "san": [host]}}
-            prot = protection_max()
 
             ai_tracker = None
             if is_connect and is_ai_host(host):
@@ -147,7 +141,8 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                 if reason:
                     labels = {"blocklist": "قائمة الحظر", "matchmaking": "مانع المطابقة", "cooldown_finish": "منع العودة بعد الإنهاء"}
                     label = labels.get(reason, reason)
-                    netctl.record_action("🛡️ حجب نطاق", f"تم حجب الاتصال بـ {host}:{port} — {label}")
+                    # dedup: اللعبة تعيد المحاولة كل ~ثانية — لا نُغرق السجل/الإشعارات
+                    netctl.record_action("🛡️ حجب نطاق", f"تم حجب الاتصال بـ {host}:{port} — {label}", dedup_sec=netctl.DEFAULT_DEDUP_SEC)
                     add_notification(f"🛡️ حُجب الاتصال بـ {host} ({label})", level="warning", host=host, rule=reason)
                     if should_log:
                         store.add({"method": method, "host": host, "port": port, "target": target, "status": f"BLOCKED ({label})", "duration_ms": 0, "category": get_host_category(host), "clean_host": host.split(":")[0] if ":" in host else host})
@@ -224,9 +219,7 @@ async def hybrid_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                             )
                     if should_log:
                         duration_ms = int((time.time()-start)*1000)
-                        adv = analyze_payload_metadata(total_relay or len(data), duration_ms, tls_info["tls_version"] if tls_info else "TLSv1.3")
-                        max_adv = max_analyze(host, total_relay or len(data), duration_ms, "tunnel")
-                        store.add({"method": method, "host": host, "port": port, "target": target, "status": "TUNNEL OK", "duration_ms": duration_ms, "cert_info": tls_info.get("cert") if tls_info else None, "tls_info": tls_info, "advanced": adv, "max_decrypt": max_adv, "protection": prot, "bytes_client": len(data), "bytes_relay": total_relay, "ai_analysis": ai_analysis, "category": get_host_category(host), "clean_host": host.split(":")[0] if ":" in host else host})
+                        store.add({"method": method, "host": host, "port": port, "target": target, "status": "TUNNEL OK", "duration_ms": duration_ms, "bytes_client": len(data), "bytes_relay": total_relay, "ai_analysis": ai_analysis, "category": get_host_category(host), "clean_host": host.split(":")[0] if ":" in host else host})
                     return
                 except Exception as e:
                     if should_log:

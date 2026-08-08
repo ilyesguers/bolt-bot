@@ -184,6 +184,45 @@ class NetCtlTests(unittest.TestCase):
         self.assertFalse(netctl.auto_finish_due(900.0))
         netctl._now = time.time
 
+    def test_protected_hosts_are_never_blocked(self):
+        # دومين اللوحة/منصة الاستضافة لا يدخل قائمة الحظر أصلاً
+        saved = netctl.save_settings(
+            {"block_hosts": ["konami.net", "my-app.up.railway.app"]}
+        )
+        self.assertIn("konami.net", saved["block_hosts"])
+        self.assertNotIn("my-app.up.railway.app", saved["block_hosts"])
+
+        # وحتى مع حجب مؤقت مفروض، يبقى دومين اللوحة متاحاً (لا 403 للوحة)
+        netctl._temp_blocks["bolt-bot-production-629c.up.railway.app"] = time.time() + 999
+        self.assertIsNone(netctl.block_reason("bolt-bot-production-629c.up.railway.app"))
+        self.assertFalse(netctl.should_block("localhost"))
+        netctl._temp_blocks.clear()
+
+    def test_finish_match_blocks_game_hosts_only(self):
+        clock = {"t": 5000.0}
+        netctl._now = lambda: clock["t"]
+        netctl.register_session(DummyWriter(), None, "www.youtube.com", 443)
+        netctl.register_session(DummyWriter(), None, "gateway.instagram.com", 443)
+        netctl.register_session(DummyWriter(), None, "bolt-bot-production-629c.up.railway.app", 443)
+        netctl.register_session(DummyWriter(), None, "pes22-game.cs.konami.net", 443)
+
+        result = netctl.finish_match(cooldown_sec=60)
+
+        # قُطعت جلسة اللعبة فقط دون يوتيوب/انستغرام/اللوحة
+        self.assertEqual(result["killed"], 1)
+        self.assertIn("pes22-game.cs.konami.net", result["blocked_hosts"])
+        self.assertNotIn("www.youtube.com", result["blocked_hosts"])
+        self.assertNotIn("gateway.instagram.com", result["blocked_hosts"])
+        self.assertNotIn("bolt-bot-production-629c.up.railway.app", result["blocked_hosts"])
+
+        # أثناء الكولداون: اللعبة محجوبة والبقية تعمل
+        self.assertTrue(netctl.should_block("pes22-game.cs.konami.net"))
+        self.assertFalse(netctl.should_block("www.youtube.com"))
+        self.assertFalse(netctl.should_block("bolt-bot-production-629c.up.railway.app"))
+
+        netctl._now = time.time
+        netctl._temp_blocks.clear()
+
     def test_result_guard_scope(self):
         netctl.save_settings({"result_guard": True, "result_guard_scope": "offline"})
         self.assertTrue(netctl.result_guard_applies("pes22-game.cs.konami.net", "full_time", "offline_ai"))

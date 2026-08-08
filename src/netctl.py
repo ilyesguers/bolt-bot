@@ -25,7 +25,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from .config import DATA_DIR
+from .config import DATA_DIR, is_efootball_host
 from .ai_analyzer import AI_HOSTS, is_ai_file
 
 DATA_FILE = Path(
@@ -35,6 +35,9 @@ DATA_FILE = Path(
 _lock = threading.RLock()
 _action_lock = threading.Lock()
 _actions: deque[dict[str, Any]] = deque(maxlen=20)
+# لمنع تكرار نفس الإجراء/الإشعار مع كل إعادة محاولة من اللعبة
+_recent_actions: dict[str, float] = {}
+DEFAULT_DEDUP_SEC = 30.0
 
 # ساعة قابلة للاستبدال في الاختبارات
 _now = time.time
@@ -101,7 +104,8 @@ def _normalize(bundle: Mapping[str, Any] | None) -> dict[str, Any]:
     cleaned = []
     for item in block_hosts:
         text = str(item).strip().lower().lstrip(".")
-        if text and text not in cleaned:
+        # حماية الذات: لا يمكن إضافة دومين اللوحة/الاستضافة لقائمة الحظر
+        if text and text not in cleaned and not is_protected_host(text):
             cleaned.append(text)
 
     return {
@@ -181,6 +185,52 @@ def _clean_host(host: str) -> str:
     return value
 
 
+# ---------------------------------------------------------------------------
+# حماية الذات: لا يُحجب أبداً دومين اللوحة نفسه ولا منصة الاستضافة
+# ---------------------------------------------------------------------------
+
+# لواحق منصات الاستضافة المدعومة — أي مضيف ينتهي بها يعتبر "ذاتنا"
+PROTECTED_SUFFIXES = ("railway.app", "railway.internal", "railway.com", "localhost")
+
+
+def _env_protected_hosts() -> set[str]:
+    """مضيفات محمية إضافية من البيئة: PROTECTED_HOSTS + دومين النشر."""
+    hosts: set[str] = set()
+    for chunk in os.environ.get("PROTECTED_HOSTS", "").split(","):
+        value = _clean_host(chunk)
+        if value:
+            hosts.add(value)
+    for key in ("RAILWAY_PUBLIC_DOMAIN", "DASHBOARD_HOST"):
+        value = _clean_host(os.environ.get(key, ""))
+        if value:
+            hosts.add(value)
+    return hosts
+
+
+def is_protected_host(host: str) -> bool:
+    """True للمضيفات التي يمنع حجبها دائماً (دومين اللوحة/الاستضافة/localhost)."""
+    value = _clean_host(host)
+    if not value:
+        return False
+    if value in ("127.0.0.1", "::1"):
+        return True
+    if any(value == suffix or value.endswith("." + suffix) for suffix in PROTECTED_SUFFIXES):
+        return True
+    return any(value == p or value.endswith("." + p) for p in _env_protected_hosts())
+
+
+def is_game_host(host: str) -> bool:
+    """True فقط لنطاقات اللعبة (KONAMI/eFootball + خادم AI) غير المحمية.
+
+    يستخدمه "إنهاء المباراة" ليحجب اللعبة وحدها دون يوتيوب/انستغرام/آبل
+    ودون دومين اللوحة نفسه.
+    """
+    value = _clean_host(host)
+    if not value or is_protected_host(value):
+        return False
+    return is_efootball_host(value) or is_ai_file(value)
+
+
 def is_matchmaking_host(host: str) -> bool:
     """تخمين: هل النطاق يخص المطابقة/البحث عن الخصم؟
 
@@ -196,10 +246,15 @@ def is_matchmaking_host(host: str) -> bool:
 
 
 def block_reason(host: str) -> str | None:
-    """سبب منع الاتصال إن وُجد: كولداون الإنهاء / قائمة الحظر / مانع المطابقة."""
+    """سبب منع الاتصال إن وُجد: كولداون الإنهاء / قائمة الحظر / مانع المطابقة.
+
+    المضيفات المحمية (دومين اللوحة/منصة الاستضافة) لا تُحجب أبداً.
+    """
     if not host:
         return None
     value = _clean_host(host)
+    if is_protected_host(value):
+        return None
     now = _now()
     with _lock:
         until = _temp_blocks.get(value)
@@ -269,11 +324,12 @@ def temp_blocks() -> list[dict[str, Any]]:
 
 
 def finish_match(cooldown_sec: int | None = None) -> dict[str, Any]:
-    """⚡ إنهاء المباراة الآن: قطع كل الاتصالات + منع إعادة الاتصال مؤقتاً.
+    """⚡ إنهاء المباراة الآن: قطع اتصالات اللعبة فقط + منع عودتها مؤقتاً.
 
-    - يغلق كل الأنفاق النشطة مع خادم اللعبة فوراً.
-    - يضيف حجباً مؤقتاً (كولداون) لكل مضيف نشط + خوادم AI المعروفة،
-      حتى لا تعود اللعبة وتكمل المباراة/المزامنة.
+    - يغلق فوراً أنفاق اللعبة فقط (نطاقات KONAMI/eFootball وخادم AI).
+    - يضيف حجباً مؤقتاً (كولداون) لنطاقات اللعبة فقط، حتى لا تعود وتكمل
+      المباراة/المزامنة. بقية الترافيك (يوتيوب/انستغرام/آبل...) والمضيفات
+      المحمية (دومين اللوحة ومنصة الاستضافة) لا تُمس أبداً.
     - يعيد ملخص: عدد المقصوص + المضيفات المحجوبة + مدة الكولداون.
 
     هذه "إنهاء" شبكي: في الأونلاين تنتهي المباراة بالقطع (تُحسب حسب سياسة
@@ -285,14 +341,16 @@ def finish_match(cooldown_sec: int | None = None) -> dict[str, Any]:
     cooldown = max(0, min(3600, cooldown))
 
     now = _now()
-    hosts: set[str] = set(AI_HOSTS)
+    hosts: set[str] = set()
     with _lock:
-        for session in list(_sessions.values()):
-            host = _clean_host(session.get("host", ""))
-            if host:
-                hosts.add(host)
+        session_hosts = [
+            _clean_host(session.get("host", "")) for session in _sessions.values()
+        ]
+    for host in list(AI_HOSTS) + session_hosts:
+        if is_game_host(host):
+            hosts.add(host)
 
-    killed = kill_all("⚡ إنهاء المباراة — منع إعادة الاتصال")
+    killed = kill_game_sessions("⚡ إنهاء المباراة — قطع اتصالات اللعبة فقط")
 
     until = now + cooldown
     with _lock:
@@ -363,10 +421,18 @@ def active_sessions() -> list[dict[str, Any]]:
         ]
 
 
-def kill_all(reason: str = "طلب يدوي من اللوحة") -> int:
-    """قطع كل الأنفاق النشطة فوراً (إغلاق الـ writers من خيط الويب)."""
+def _kill_sessions(reason: str, host_filter=None) -> int:
+    """قطع الأنفاق النشطة فوراً (إغلاق الـ writers من خيط الويب).
+
+    ``host_filter`` اختياري: دالة تستقبل المضيف النظيف وتعيد True للجلسات
+    المراد قطعها — بدونه تُقطع كل الجلسات.
+    """
     with _lock:
-        targets = list(_sessions.values())
+        targets = [
+            session
+            for session in _sessions.values()
+            if host_filter is None or host_filter(_clean_host(session.get("host", "")))
+        ]
         for session in targets:
             session["abort"] = True
             writer = session.get("writer")
@@ -382,19 +448,42 @@ def kill_all(reason: str = "طلب يدوي من اللوحة") -> int:
     return count
 
 
+def kill_all(reason: str = "طلب يدوي من اللوحة") -> int:
+    """قطع كل الأنفاق النشطة فوراً."""
+    return _kill_sessions(reason)
+
+
+def kill_game_sessions(reason: str = "إنهاء المباراة") -> int:
+    """قطع اتصالات اللعبة فقط (نطاقات KONAMI/AI) دون بقية الترافيك."""
+    return _kill_sessions(reason, is_game_host)
+
+
 # ---------------------------------------------------------------------------
 # سجل الإجراءات
 # ---------------------------------------------------------------------------
 
-def record_action(msg: str, detail: str = "") -> dict[str, Any]:
-    item: dict[str, Any] = {
-        "id": uuid.uuid4().hex[:8],
-        "timestamp": time.time(),
-        "time": time.strftime("%H:%M:%S"),
-        "msg": str(msg),
-        "detail": str(detail),
-    }
+def record_action(msg: str, detail: str = "", dedup_sec: float = 0.0) -> dict[str, Any] | None:
+    """سجّل إجراءً؛ مع ``dedup_sec`` يُهمل نفس الإجراء (نفس النص والتفاصيل)
+    خلال النافذة — لمنع إغراق السجل بإعادات المحاولة المتطابقة."""
+    now = time.time()
+    key = f"{msg}|{detail}"
     with _action_lock:
+        if dedup_sec > 0:
+            last = _recent_actions.get(key)
+            if last is not None and now - last < dedup_sec:
+                return None
+            _recent_actions[key] = now
+            if len(_recent_actions) > 200:
+                cutoff = now - dedup_sec
+                for stale in [k for k, v in _recent_actions.items() if v < cutoff]:
+                    _recent_actions.pop(stale, None)
+        item: dict[str, Any] = {
+            "id": uuid.uuid4().hex[:8],
+            "timestamp": now,
+            "time": time.strftime("%H:%M:%S", time.localtime(now)),
+            "msg": str(msg),
+            "detail": str(detail),
+        }
         _actions.append(item)
     return item
 

@@ -151,6 +151,10 @@ _file_lock = threading.RLock()
 _notification_lock = threading.Lock()
 notifications: deque[dict[str, Any]] = deque(maxlen=20)
 
+# نافذة منع تكرار نفس الإشعار (اللعبة تعيد المحاولة كل ~ثانية أثناء الحجب)
+NOTIFY_DEDUP_SEC = float(os.environ.get("NOTIFY_DEDUP_SEC", "30"))
+_recent_notifications: dict[str, float] = {}
+
 # آخر تحليل اتصال AI (لحساب حالة الميزات في اللوحة)
 _last_analysis_lock = threading.Lock()
 _last_analysis: dict[str, Any] | None = None
@@ -431,17 +435,29 @@ def get_last_analysis() -> dict[str, Any] | None:
 # الإشعارات
 # ---------------------------------------------------------------------------
 
-def add_notification(msg: str, level: str = "info", **details: Any) -> dict[str, Any]:
-    item: dict[str, Any] = {
-        "id": uuid.uuid4().hex[:8],
-        "timestamp": time.time(),
-        "time": time.strftime("%H:%M:%S"),
-        "level": level,
-        "msg": str(msg),
-    }
-    if details:
-        item["details"] = details
+def add_notification(msg: str, level: str = "info", **details: Any) -> dict[str, Any] | None:
+    """أضف إشعاراً للوحة؛ نفس النص خلال ``NOTIFY_DEDUP_SEC`` يُهمل حتى لا
+    تتكرر الإشعارات مع كل إعادة محاولة من اللعبة (كل ~ثانية)."""
+    now = time.time()
+    key = str(msg)
     with _notification_lock:
+        last = _recent_notifications.get(key)
+        if last is not None and now - last < NOTIFY_DEDUP_SEC:
+            return None
+        _recent_notifications[key] = now
+        if len(_recent_notifications) > 200:
+            cutoff = now - NOTIFY_DEDUP_SEC
+            for stale in [k for k, v in _recent_notifications.items() if v < cutoff]:
+                _recent_notifications.pop(stale, None)
+        item: dict[str, Any] = {
+            "id": uuid.uuid4().hex[:8],
+            "timestamp": now,
+            "time": time.strftime("%H:%M:%S", time.localtime(now)),
+            "level": level,
+            "msg": key,
+        }
+        if details:
+            item["details"] = details
         notifications.append(item)
     return item
 
